@@ -6,11 +6,18 @@ import MenuScene from './scenes/MenuScene.js';
 import GameScene from './scenes/GameScene.js';
 import OverScene from './scenes/OverScene.js';
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   width: W,
   height: H,
   parent: 'game',
   backgroundColor: HEX(PAL.ink),
+  // Адаптив: поле вписывается в любой экран с сохранением пропорций.
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
   scene: [BootScene, MenuScene, GameScene, OverScene],
 });
+
+if (import.meta.env.DEV) window.__APPARAT__ = game;

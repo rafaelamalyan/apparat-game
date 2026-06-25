@@ -35,6 +35,13 @@ export default class MenuScene extends Phaser.Scene {
     rules.forEach((r, i) => this.add.text(W / 2, 590 + i * 26, r,
       { font: '15px Segoe UI', color: '#b8c2dc' }).setOrigin(0.5).setDepth(60));
 
+    // Подсказка управления под устройство.
+    const ctrl = this.sys.game.device.input.touch
+      ? 'Веди Серёгу пальцем  ·  тапни по лотку нужного цвета — сгрузить'
+      : '← →  или  A / D — двигать  ·  ↓ / пробел над лотком — сгрузить';
+    this.add.text(W / 2, 668, ctrl,
+      { font: '600 14px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(60);
+
     const btn = this.add.text(W / 2, 700, 'НАЧАТЬ СМЕНУ  ▶',
       { font: '800 28px Segoe UI', color: HEX(PAL.ink), backgroundColor: HEX(PAL.brass), padding: { x: 32, y: 14 } })
       .setOrigin(0.5).setDepth(60).setInteractive({ useHandCursor: true });

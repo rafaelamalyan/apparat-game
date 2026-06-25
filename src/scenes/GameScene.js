@@ -38,8 +38,32 @@ export default class GameScene extends Phaser.Scene {
     this.keyA = this.input.keyboard.addKey('A');
     this.keyD = this.input.keyboard.addKey('D');
 
+    this.setupTouch();
+
     this.scheduleSpawn();
     this.refreshHUD();
+  }
+
+  // Сенсорное управление (телефон) + мышь (десктоп).
+  // Тащить палец — Серёга едет за ним; тап по лотку — сгрузить туда.
+  setupTouch() {
+    this.touchTargetX = null;            // куда вести Серёгу (null = стоим)
+    const trayBand = H - 110;            // ниже этой линии — зона лотков
+
+    const slotAt = (x, y) => (y < trayBand)
+      ? null
+      : this.slots.find((s) => Math.abs(s.x - x) < s.w / 2) || null;
+
+    this.input.on('pointerdown', (p) => {
+      const slot = slotAt(p.x, p.y);
+      if (slot) { this.dropToSlot(slot); this.touchTargetX = null; return; }
+      this.touchTargetX = Phaser.Math.Clamp(p.x, 60, W - 60);
+    });
+    this.input.on('pointermove', (p) => {
+      if (!p.isDown || p.y >= trayBand) return;   // в зоне лотков не водим
+      this.touchTargetX = Phaser.Math.Clamp(p.x, 60, W - 60);
+    });
+    this.input.on('pointerup', () => { this.touchTargetX = null; });
   }
 
   buildTrays() {
@@ -218,8 +242,22 @@ export default class GameScene extends Phaser.Scene {
     let dir = 0;
     if (this.cursors.left.isDown || this.keyA.isDown) dir = -1;
     if (this.cursors.right.isDown || this.keyD.isDown) dir = 1;
-    this.player.x = Phaser.Math.Clamp(this.player.x + dir * this.playerSpeed * dt, 60, W - 60);
-    if (dir) { this.player.setFlipX(dir < 0); this.layoutHeld(); }
+
+    if (dir) {
+      // Клавиатура имеет приоритет и сбрасывает «погоню» за пальцем.
+      this.touchTargetX = null;
+      this.player.x = Phaser.Math.Clamp(this.player.x + dir * this.playerSpeed * dt, 60, W - 60);
+      this.player.setFlipX(dir < 0);
+      this.layoutHeld();
+    } else if (this.touchTargetX !== null) {
+      // Движение к пальцу — своей скоростью, без телепорта.
+      const ddx = this.touchTargetX - this.player.x;
+      const step = this.playerSpeed * dt;
+      if (Math.abs(ddx) <= step) this.player.x = this.touchTargetX;
+      else { this.player.x += Math.sign(ddx) * step; this.player.setFlipX(ddx < 0); }
+      this.player.x = Phaser.Math.Clamp(this.player.x, 60, W - 60);
+      this.layoutHeld();
+    }
     this.player.y = this.player.y0 + Math.sin(time / 300) * 3;
     if (this.city) this.city.x = (this.player.x - W / 2) * -0.04;
 
