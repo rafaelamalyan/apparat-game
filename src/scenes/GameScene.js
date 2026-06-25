@@ -1,26 +1,36 @@
 // Основной игровой цикл: спавн поручений, ловля, маршрутизация,
 // настроение босса, частицы и реакция мира.
 import Phaser from 'phaser';
-import { W, H, PAL, HEX, DEPTS, BALANCE, KAREN_LINES, KAREN_LINES_ANGRY, saveBest } from '../core/config.js';
+import { W, H, PAL, HEX, DEPTS, BALANCE, KAREN_LINES, KAREN_LINES_ANGRY } from '../core/config.js';
 import { buildOffice } from '../core/office.js';
 import { SFX, toggleMute, isMuted } from '../core/audio.js';
+import { run, effStats, roundDuration, roundDiff, saveBestRound } from '../core/run.js';
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
 
   create() {
+    const st = effStats();
     this.score = 0;
-    this.lives = BALANCE.startLives;
+    this.startLives = st.lives;
+    this.lives = st.lives;
     this.mood = BALANCE.startMood;
     this.held = [];
-    this.maxHeld = BALANCE.maxHeld;
+    this.maxHeld = st.maxHeld;
+    this.scoreMult = st.mult;
+    this.moodMul = st.moodMul;
+    this.spawnMul = st.spawnMul;
     this.tasks = [];
     this.over = false;
-    this.fallBase = BALANCE.fallBase;
+    this.fallBase = BALANCE.fallBase * roundDiff(run.round);   // сложнее с каждым раундом
     this.combo = 0;
     this.bonus = false;                       // идёт ли бонус-волна
     this.bonusUntil = 0;
     this.nextQuarter = BALANCE.quarterEvery;   // следующий порог очков для волны
+
+    // Таймер раунда.
+    this.roundLeft = roundDuration(run.round) * 1000;
+    this.roundLen = this.roundLeft;
 
     const office = buildOffice(this);
     this.city = office.city;
@@ -34,10 +44,11 @@ export default class GameScene extends Phaser.Scene {
     this.karen = this.add.image(W / 2, 150, 'karen_idle').setScale(0.6).setDepth(20);
     this.player = this.add.image(W / 2, H - 200, 'sergey_catch').setScale(0.54).setDepth(35);
     this.player.y0 = this.player.y;
-    this.playerSpeed = 560;
+    this.playerSpeed = st.speed;
 
     this.buildParticles();
     this.buildHUD();
+    if (st.olya > 0) this.spawnOlya(st.olya);
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keyA = this.input.keyboard.addKey('A');
@@ -48,6 +59,92 @@ export default class GameScene extends Phaser.Scene {
 
     this.scheduleSpawn();
     this.refreshHUD();
+  }
+
+  // Помощница Оля — автономный второй ловец (плейсхолдер: тонированный спрайт).
+  spawnOlya(level) {
+    this.olyaSpeed = 360 + level * 80;
+    this.olyaMaxHeld = 2 + level;            // вместимость рук Оли
+    this.olyaHeld = [];
+    this.olya = this.add.image(W / 2 + 150, H - 196, 'sergey_catch')
+      .setScale(0.46).setDepth(34).setTint(0xff9ec8);     // розоватый оттенок
+    this.olya.y0 = this.olya.y;
+    this.olya.targetX = W / 2 + 150;
+    this.olyaTag = this.add.text(this.olya.x, this.olya.y - 96, 'Оля',
+      { font: '700 13px Segoe UI', color: HEX(0xff9ec8) }).setOrigin(0.5).setDepth(34);
+  }
+
+  updateOlya(dt) {
+    const o = this.olya;
+    let target = o.x;
+    if (this.olyaHeld.length > 0) {
+      const slot = this.olyaSlotFor(this.olyaHeld[0]);   // верный свободный лоток
+      if (slot) {
+        target = slot.x;
+        if (Math.abs(o.x - slot.x) < 26) this.olyaDrop(slot);
+      }
+    } else {
+      const t = this.olyaNearestTask();
+      if (t) target = t.cont.x;
+    }
+    const ddx = target - o.x, step = this.olyaSpeed * dt;
+    if (Math.abs(ddx) > step) { o.x += Math.sign(ddx) * step; o.setFlipX(ddx < 0); }
+    o.x = Phaser.Math.Clamp(o.x, 60, W - 60);
+    o.y = o.y0 + Math.sin(this.time.now / 280 + 1) * 3;
+    this.olyaTag.setPosition(o.x, o.y - 96);
+    this.layoutOlyaHeld();
+
+    if (this.olyaHeld.length < this.olyaMaxHeld) {
+      for (const t of this.tasks) {
+        if (!t.caught && Math.abs(t.cont.x - o.x) < 52 && Math.abs(t.cont.y - (o.y - 40)) < 46) {
+          this.olyaCatch(t); break;
+        }
+      }
+    }
+  }
+
+  olyaNearestTask() {
+    let best = null, bd = 1e9;
+    for (const t of this.tasks) {
+      if (t.caught) continue;
+      const d = Math.abs(t.cont.x - this.olya.x);
+      if (d < bd) { bd = d; best = t; }
+    }
+    return best;
+  }
+
+  olyaSlotFor(t) {
+    if (t.grey) return this.slots.find((s) => !s.locked) || null;
+    const s = this.slots.find((x) => x.key === t.dept.key);
+    return s && !s.locked ? s : null;
+  }
+
+  olyaCatch(t) {
+    t.caught = true;
+    this.tasks = this.tasks.filter((x) => x !== t);
+    this.olyaHeld.push(t);
+    this.olya.setTexture('sergey_carry').setTint(0xff9ec8);
+    SFX.catch();
+    this.sparks.emitParticleAt(this.olya.x, this.olya.y - 46, 6);
+  }
+
+  olyaDrop(slot) {
+    const t = this.olyaHeld.shift();
+    this.tweens.add({ targets: t.cont, x: slot.x, y: slot.y - 10, scale: 0.5, alpha: 0, duration: 170, onComplete: () => t.cont.destroy() });
+    const gain = Math.round(10 * (this.bonus ? 2 : 1) * this.scoreMult);
+    this.score += gain;
+    SFX.good();
+    this.sparks.emitParticleAt(slot.x, slot.y - 20, 10);
+    this.popSlot(slot);
+    slot.load++;
+    if (slot.load >= BALANCE.slotOverload && !slot.locked) { slot.locked = true; slot.lockT = this.time.now + BALANCE.slotLockMs; }
+    if (this.olyaHeld.length === 0) this.olya.setTexture('sergey_catch').setTint(0xff9ec8);
+    this.refreshHUD();
+  }
+
+  layoutOlyaHeld() {
+    this.olyaHeld.forEach((t, i) =>
+      t.cont.setPosition(this.olya.x - 26 + i * 30, this.olya.y - 56));
   }
 
   // Кнопка-индикатор звука + переключение на M.
@@ -188,11 +285,13 @@ export default class GameScene extends Phaser.Scene {
     this.comboT = this.add.text(20, 38, '', { font: '700 14px Segoe UI', color: HEX(PAL.teal) }).setDepth(46);
     this.x2T = this.add.text(W / 2, 50, '', { font: '900 16px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5, 0).setDepth(46);
     this.livesT = this.add.text(W - 20, 14, '', { font: '900 24px Segoe UI', color: HEX(PAL.red) }).setOrigin(1, 0).setDepth(46);
-    this.add.text(W / 2, 8, 'НАСТРОЕНИЕ БОССА', { font: '700 12px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5, 0).setDepth(46);
+    this.roundT = this.add.text(W / 2, 6, '', { font: '800 15px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5, 0).setDepth(46);
     const mf = this.add.graphics().setDepth(46);
-    mf.fillStyle(PAL.ink, 1); mf.fillRoundedRect(W / 2 - 130, 28, 260, 16, 8);
-    mf.lineStyle(2, PAL.brassDk, 1); mf.strokeRoundedRect(W / 2 - 130, 28, 260, 16, 8);
-    this.moodBar = this.add.rectangle(W / 2 - 126, 36, 4, 10, PAL.teal).setOrigin(0, 0.5).setDepth(46);
+    mf.fillStyle(PAL.ink, 1); mf.fillRoundedRect(W / 2 - 130, 28, 260, 14, 7);
+    mf.lineStyle(2, PAL.brassDk, 1); mf.strokeRoundedRect(W / 2 - 130, 28, 260, 14, 7);
+    this.moodBar = this.add.rectangle(W / 2 - 126, 35, 4, 9, PAL.teal).setOrigin(0, 0.5).setDepth(46);
+    // Полоса времени раунда (вверху экрана).
+    this.timeBar = this.add.rectangle(0, 0, W, 5, PAL.teal).setOrigin(0, 0).setDepth(47);
   }
 
   scheduleSpawn() {
@@ -200,7 +299,7 @@ export default class GameScene extends Phaser.Scene {
     const m = this.mood / 100;
     const d = this.bonus
       ? BALANCE.bonusSpawnMs
-      : Phaser.Math.Linear(BALANCE.spawnSlow, BALANCE.spawnFast, m);
+      : Phaser.Math.Linear(BALANCE.spawnSlow, BALANCE.spawnFast, m) * this.spawnMul;
     this.time.delayedCall(d, () => { this.spawn(); this.scheduleSpawn(); });
   }
 
@@ -265,16 +364,16 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: t.cont, x: slot.x, y: slot.y - 10, scale: 0.5, alpha: 0, duration: 170, onComplete: () => t.cont.destroy() });
     const ok = t.grey || t.dept.key === slot.key;
 
-    const mult = this.bonus ? 2 : 1;
+    const mult = (this.bonus ? 2 : 1) * this.scoreMult;
     if (t.grey) {
-      const g = 12 * mult;
+      const g = Math.round(12 * mult);
       this.score += g; this.mood = Math.max(0, this.mood - 3); this.combo++;
       SFX.good();
       this.flash('+' + g + ' ПРИСТРОИЛ', HEX(slot.light)); slot.load++; this.popSlot(slot);
     } else if (ok) {
       this.combo++;
       const b = Math.min(this.combo, 5) * 2;
-      const gain = (10 + b) * mult;
+      const gain = Math.round((10 + b) * mult);
       this.score += gain; this.mood = Math.max(0, this.mood - 5);
       if (this.combo > 1) SFX.combo(this.combo); else SFX.good();
       this.flash('+' + gain + (this.combo > 1 ? '  СЕРИЯ x' + this.combo : ''), HEX(slot.light));
@@ -283,7 +382,7 @@ export default class GameScene extends Phaser.Scene {
       this.popSlot(slot);
     } else {
       this.combo = 0;
-      this.score = Math.max(0, this.score - 12); this.mood = Math.min(100, this.mood + 13);
+      this.score = Math.max(0, this.score - 12); this.mood = Math.min(100, this.mood + 13 * this.moodMul);
       SFX.bad();
       this.flash('-12 ЧУЖОЙ ОТДЕЛ!', HEX(PAL.red));
       this.papers.emitParticleAt(slot.x, slot.y - 20, 10);
@@ -308,7 +407,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   loseLife(reason) {
-    this.lives--; this.combo = 0; this.mood = Math.min(100, this.mood + 10);
+    this.lives--; this.combo = 0; this.mood = Math.min(100, this.mood + 10 * this.moodMul);
     SFX.life();
     this.flash(reason, HEX(PAL.red));
     this.cameras.main.shake(220, 0.008);
@@ -330,6 +429,15 @@ export default class GameScene extends Phaser.Scene {
   update(time, delta) {
     if (this.over) return;
     const dt = delta / 1000;
+
+    // Таймер раунда.
+    this.roundLeft -= delta;
+    const secs = Math.max(0, Math.ceil(this.roundLeft / 1000));
+    this.roundT.setText('РАУНД ' + run.round + '   ·   ⏱ ' + secs + ' с');
+    this.timeBar.width = W * Phaser.Math.Clamp(this.roundLeft / this.roundLen, 0, 1);
+    this.timeBar.fillColor = secs <= 5 ? PAL.red : secs <= 10 ? PAL.brass : PAL.teal;
+    if (this.roundLeft <= 0) { this.finishRound(); return; }
+
     let dir = 0;
     if (this.cursors.left.isDown || this.keyA.isDown) dir = -1;
     if (this.cursors.right.isDown || this.keyD.isDown) dir = 1;
@@ -376,6 +484,8 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
+    if (this.olya) this.updateOlya(dt);
+
     if (this.bonus && time > this.bonusUntil) this.endBonus();
 
     this.slots.forEach((s) => {
@@ -388,10 +498,27 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
+  // Раунд доигран до конца — начисляем премию и идём в магазин.
+  finishRound() {
+    this.over = true;
+    SFX.record();
+    const noLoss = this.lives === this.startLives;
+    const livesBonus = this.lives * 12;
+    const noLossBonus = noLoss ? 40 : 0;
+    const premia = this.score + livesBonus + noLossBonus;
+    run.budget += premia;
+    run.totalEarned += premia;
+    run.lastResult = { round: run.round, score: this.score, livesBonus, noLossBonus, premia, lives: this.lives, noLoss };
+    saveBestRound(run.round);
+    this.cameras.main.fade(420, 13, 20, 36);
+    this.time.delayedCall(440, () => this.scene.start('Shop'));
+  }
+
+  // Жизни кончились — карьера обрывается.
   end() {
     this.over = true;
     SFX.over();
-    const record = saveBest(this.score);
-    this.scene.start('Over', { score: this.score, record });
+    const record = saveBestRound(run.round);
+    this.scene.start('Over', { round: run.round, budget: run.budget, totalEarned: run.totalEarned, record });
   }
 }

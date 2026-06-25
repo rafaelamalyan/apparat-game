@@ -55,11 +55,3 @@ export const KAREN_LINES_ANGRY = [
   'Я сказал — бегом!', 'Опять провал?!', 'Где дисциплина?!',
   'Уволю к чёрту!', 'Шевелись!', 'Это саботаж!',
 ];
-
-// Рекорд смены — в localStorage.
-export const getBest = () => +localStorage.getItem('apparat_best') || 0;
-export const saveBest = (s) => {
-  const best = getBest();
-  if (s > best) { localStorage.setItem('apparat_best', String(s)); return true; }
-  return false;
-};
