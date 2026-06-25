@@ -19,12 +19,15 @@ export default class BootScene extends Phaser.Scene {
     this.makeSpark();
     this.makeDust();
     this.makeVignette();
-    // Стартуем меню только когда шрифты загружены — иначе Phaser
-    // нарисует текст системным и не перерисует.
-    const fonts = [
+    // Ждём шрифты (для чёткого текста), но не дольше 1.5с —
+    // иначе при медленной/заблокированной сети игра не стартовала бы.
+    const fonts = Promise.all([
       '700 40px "PT Serif"', '400 16px "PT Sans"', '700 16px "PT Sans"',
-    ].map((f) => document.fonts.load(f));
-    Promise.all(fonts).catch(() => {}).finally(() => this.scene.start('Menu'));
+    ].map((f) => document.fonts.load(f))).catch(() => {});
+    const timeout = new Promise((res) => setTimeout(res, 1500));
+    let started = false;
+    const go = () => { if (!started) { started = true; this.scene.start('Menu'); } };
+    Promise.race([fonts, timeout]).then(go);
   }
 
   // Цветная папка-поручение под департамент (или серая).
