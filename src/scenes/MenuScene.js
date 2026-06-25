@@ -28,7 +28,7 @@ export default class MenuScene extends Phaser.Scene {
     const s = this.add.image(W / 2 + 200, 414, 'sergey_catch').setScale(0.94).setDepth(60);
     this.tweens.add({ targets: k, y: '-=10', duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.tweens.add({ targets: s, y: '-=12', duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: 300 });
-    this.add.text(W / 2 - 200, 566, 'КАРЕН Г.  ·  генеральный',
+    this.add.text(W / 2 - 200, 566, 'ШЕФ  ·  генеральный',
       { font: '600 15px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
     this.add.text(W / 2 + 200, 566, 'СЕРЁГА  ·  Аппарат (вы)',
       { font: '600 15px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
