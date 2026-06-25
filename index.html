@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Аппарат · поток поручений</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #0d1424;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background-image: radial-gradient(circle at 50% 0%, #1a2440 0%, #0d1424 70%);
+    }
+    #wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100%;
+      padding: 18px 0;
+    }
+    #game {
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(232, 176, 74, 0.15);
+    }
+    .hint {
+      color: #7f8aa3;
+      font-size: 13px;
+      margin-top: 16px;
+      letter-spacing: 0.4px;
+      text-align: center;
+    }
+    .hint b { color: #e8b04a; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="game"></div>
+    <div class="hint">
+      <b>← →</b> / <b>A D</b> — двигать Серёгу &nbsp;·&nbsp;
+      <b>↓</b> / <b>пробел</b> над лотком того же ЦВЕТА — сгрузить
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

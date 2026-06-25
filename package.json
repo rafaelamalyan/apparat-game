@@ -1,0 +1,17 @@
+{
+  "name": "apparat-game",
+  "version": "0.2.0",
+  "description": "Аппарат — поток поручений. 2D-аркада на Phaser 3.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
