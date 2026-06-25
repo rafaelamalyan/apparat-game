@@ -1,6 +1,6 @@
 // Стартовый экран: заголовок, персонажи, правила, кнопка старта.
 import Phaser from 'phaser';
-import { W, PAL, HEX } from '../core/config.js';
+import { W, PAL, HEX, getBest } from '../core/config.js';
 import { buildOffice } from '../core/office.js';
 
 export default class MenuScene extends Phaser.Scene {
@@ -18,6 +18,11 @@ export default class MenuScene extends Phaser.Scene {
     this.add.text(W / 2, 210, 'П О Т О К   П О Р У Ч Е Н И Й',
       { font: '600 18px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(60);
 
+    const best = getBest();
+    if (best > 0)
+      this.add.text(W / 2, 250, '🏆 Рекорд смены: ' + best,
+        { font: '700 16px Segoe UI', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
+
     const k = this.add.image(W / 2 - 170, 430, 'karen_throw').setScale(0.7).setDepth(60);
     const s = this.add.image(W / 2 + 170, 430, 'sergey_catch').setScale(0.66).setDepth(60);
     this.tweens.add({ targets: k, y: '-=10', duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
@@ -34,13 +39,6 @@ export default class MenuScene extends Phaser.Scene {
     ];
     rules.forEach((r, i) => this.add.text(W / 2, 590 + i * 26, r,
       { font: '15px Segoe UI', color: '#b8c2dc' }).setOrigin(0.5).setDepth(60));
-
-    // Подсказка управления под устройство.
-    const ctrl = this.sys.game.device.input.touch
-      ? 'Веди Серёгу пальцем  ·  тапни по лотку нужного цвета — сгрузить'
-      : '← →  или  A / D — двигать  ·  ↓ / пробел над лотком — сгрузить';
-    this.add.text(W / 2, 668, ctrl,
-      { font: '600 14px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(60);
 
     const btn = this.add.text(W / 2, 700, 'НАЧАТЬ СМЕНУ  ▶',
       { font: '800 28px Segoe UI', color: HEX(PAL.ink), backgroundColor: HEX(PAL.brass), padding: { x: 32, y: 14 } })

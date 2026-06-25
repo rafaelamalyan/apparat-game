@@ -1,8 +1,9 @@
 // Основной игровой цикл: спавн поручений, ловля, маршрутизация,
 // настроение босса, частицы и реакция мира.
 import Phaser from 'phaser';
-import { W, H, PAL, HEX, DEPTS, BALANCE } from '../core/config.js';
+import { W, H, PAL, HEX, DEPTS, BALANCE, KAREN_LINES, KAREN_LINES_ANGRY, saveBest } from '../core/config.js';
 import { buildOffice } from '../core/office.js';
+import { SFX, toggleMute, isMuted } from '../core/audio.js';
 
 export default class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
@@ -39,9 +40,43 @@ export default class GameScene extends Phaser.Scene {
     this.keyD = this.input.keyboard.addKey('D');
 
     this.setupTouch();
+    this.setupSound();
 
     this.scheduleSpawn();
     this.refreshHUD();
+  }
+
+  // Кнопка-индикатор звука + переключение на M.
+  setupSound() {
+    this.soundT = this.add.text(W - 20, 44, isMuted() ? '🔇' : '🔊',
+      { font: '20px Segoe UI' }).setOrigin(1, 0).setDepth(46)
+      .setInteractive({ useHandCursor: true });
+    const flip = () => this.soundT.setText(toggleMute() ? '🔇' : '🔊');
+    this.soundT.on('pointerdown', (p, lx, ly, e) => { if (e) e.stopPropagation(); flip(); });
+    this.input.keyboard.on('keydown-M', flip);
+  }
+
+  // Облачко с репликой Карена при броске.
+  karenSay(angry) {
+    if (this.bubble) this.bubble.destroy();
+    const pool = angry ? KAREN_LINES_ANGRY : KAREN_LINES;
+    const txt = Phaser.Utils.Array.GetRandom(pool);
+    const label = this.add.text(0, 0, txt,
+      { font: '700 16px Segoe UI', color: HEX(angry ? PAL.red : PAL.ink) }).setOrigin(0.5);
+    const pad = 12, bw = label.width + pad * 2, bh = label.height + pad;
+    const bg = this.add.graphics();
+    bg.fillStyle(PAL.paper, 1); bg.fillRoundedRect(-bw / 2, -bh / 2, bw, bh, 9);
+    bg.fillTriangle(-10, bh / 2 - 1, 10, bh / 2 - 1, -2, bh / 2 + 12);
+    bg.lineStyle(2, angry ? PAL.red : PAL.brassDk, 1); bg.strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, 9);
+    const b = this.add.container(this.karen.x + 130, this.karen.y - 70, [bg, label]).setDepth(47);
+    b.setScale(0.4); b.setAlpha(0);
+    this.tweens.add({ targets: b, scale: 1, alpha: 1, duration: 160, ease: 'Back.out' });
+    this.bubble = b;
+    this.time.delayedCall(1100, () => {
+      if (b !== this.bubble) return;
+      this.tweens.add({ targets: b, alpha: 0, y: b.y - 16, duration: 260,
+        onComplete: () => { if (this.bubble === b) this.bubble = null; b.destroy(); } });
+    });
   }
 
   // Сенсорное управление (телефон) + мышь (десктоп).
@@ -49,18 +84,20 @@ export default class GameScene extends Phaser.Scene {
   setupTouch() {
     this.touchTargetX = null;            // куда вести Серёгу (null = стоим)
     const trayBand = H - 110;            // ниже этой линии — зона лотков
+    const hudBand = 56;                  // верхняя полоса HUD (счёт, звук) — не трогаем
 
     const slotAt = (x, y) => (y < trayBand)
       ? null
       : this.slots.find((s) => Math.abs(s.x - x) < s.w / 2) || null;
 
     this.input.on('pointerdown', (p) => {
+      if (p.y < hudBand) return;                  // клики по HUD не двигают
       const slot = slotAt(p.x, p.y);
       if (slot) { this.dropToSlot(slot); this.touchTargetX = null; return; }
       this.touchTargetX = Phaser.Math.Clamp(p.x, 60, W - 60);
     });
     this.input.on('pointermove', (p) => {
-      if (!p.isDown || p.y >= trayBand) return;   // в зоне лотков не водим
+      if (!p.isDown || p.y < hudBand || p.y >= trayBand) return;   // HUD и зона лотков — не водим
       this.touchTargetX = Phaser.Math.Clamp(p.x, 60, W - 60);
     });
     this.input.on('pointerup', () => { this.touchTargetX = null; });
@@ -126,9 +163,11 @@ export default class GameScene extends Phaser.Scene {
 
   spawn() {
     if (this.over) return;
-    this.karen.setTexture(this.mood > 62 ? 'karen_angry' : 'karen_throw');
+    const angry = this.mood > 62;
+    this.karen.setTexture(angry ? 'karen_angry' : 'karen_throw');
     this.tweens.add({ targets: this.karen, scaleX: 0.64, duration: 120, yoyo: true });
     this.time.delayedCall(360, () => { if (!this.over) this.karen.setTexture('karen_idle'); });
+    this.karenSay(angry);
 
     const grey = Math.random() < BALANCE.greyChance;
     const dept = grey ? null : Phaser.Utils.Array.GetRandom(DEPTS);
@@ -161,6 +200,7 @@ export default class GameScene extends Phaser.Scene {
     t.caught = true;
     this.tasks = this.tasks.filter((x) => x !== t);
     this.held.push(t);
+    SFX.catch();
     this.player.setTexture('sergey_carry');
     this.sparks.emitParticleAt(this.player.x, this.player.y - 50, 8);
     this.bumpPlayer();
@@ -177,18 +217,20 @@ export default class GameScene extends Phaser.Scene {
 
   dropToSlot(slot) {
     if (this.held.length === 0) return;
-    if (slot.locked) { this.flash(slot.name + ' ПЕРЕГРУЖЕН', HEX(PAL.red)); return; }
+    if (slot.locked) { SFX.bad(); this.flash(slot.name + ' ПЕРЕГРУЖЕН', HEX(PAL.red)); return; }
     const t = this.held.shift();
     this.tweens.add({ targets: t.cont, x: slot.x, y: slot.y - 10, scale: 0.5, alpha: 0, duration: 170, onComplete: () => t.cont.destroy() });
     const ok = t.grey || t.dept.key === slot.key;
 
     if (t.grey) {
       this.score += 12; this.mood = Math.max(0, this.mood - 3); this.combo++;
+      SFX.good();
       this.flash('+12 ПРИСТРОИЛ', HEX(slot.light)); slot.load++; this.popSlot(slot);
     } else if (ok) {
       this.combo++;
       const b = Math.min(this.combo, 5) * 2;
       this.score += 10 + b; this.mood = Math.max(0, this.mood - 5);
+      if (this.combo > 1) SFX.combo(this.combo); else SFX.good();
       this.flash('+' + (10 + b) + (this.combo > 1 ? '  СЕРИЯ x' + this.combo : ''), HEX(slot.light));
       slot.load++;
       this.sparks.emitParticleAt(slot.x, slot.y - 20, 14);
@@ -196,6 +238,7 @@ export default class GameScene extends Phaser.Scene {
     } else {
       this.combo = 0;
       this.score = Math.max(0, this.score - 12); this.mood = Math.min(100, this.mood + 13);
+      SFX.bad();
       this.flash('-12 ЧУЖОЙ ОТДЕЛ!', HEX(PAL.red));
       this.papers.emitParticleAt(slot.x, slot.y - 20, 10);
       this.cameras.main.shake(180, 0.006);
@@ -219,6 +262,7 @@ export default class GameScene extends Phaser.Scene {
 
   loseLife(reason) {
     this.lives--; this.combo = 0; this.mood = Math.min(100, this.mood + 10);
+    SFX.life();
     this.flash(reason, HEX(PAL.red));
     this.cameras.main.shake(220, 0.008);
     this.refreshHUD();
@@ -295,5 +339,10 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  end() { this.over = true; this.scene.start('Over', { score: this.score }); }
+  end() {
+    this.over = true;
+    SFX.over();
+    const record = saveBest(this.score);
+    this.scene.start('Over', { score: this.score, record });
+  }
 }

@@ -1,7 +1,8 @@
 // Экран окончания смены: итоговый счёт и рестарт.
 import Phaser from 'phaser';
-import { W, H, PAL, HEX } from '../core/config.js';
+import { W, H, PAL, HEX, getBest } from '../core/config.js';
 import { buildOffice } from '../core/office.js';
+import { SFX } from '../core/audio.js';
 
 export default class OverScene extends Phaser.Scene {
   constructor() { super('Over'); }
@@ -17,6 +18,17 @@ export default class OverScene extends Phaser.Scene {
 
     this.add.text(W / 2, 295, 'Итог: ' + (data.score || 0) + ' очков',
       { font: '700 30px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(60);
+
+    if (data.record) {
+      const r = this.add.text(W / 2, 350, '🏆 НОВЫЙ РЕКОРД!',
+        { font: '900 26px Segoe UI', color: HEX(PAL.teal) }).setOrigin(0.5).setDepth(60);
+      r.setStroke(HEX(PAL.ink), 6);
+      this.tweens.add({ targets: r, scale: 1.12, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      this.time.delayedCall(250, () => SFX.record());
+    } else {
+      this.add.text(W / 2, 350, '🏆 Рекорд: ' + getBest(),
+        { font: '600 20px Segoe UI', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60).setAlpha(0.85);
+    }
 
     const s = this.add.image(W / 2, 470, 'sergey_idle').setScale(0.72).setDepth(60);
     this.tweens.add({ targets: s, y: '-=12', duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });

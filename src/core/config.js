@@ -40,3 +40,23 @@ export const BALANCE = {
   slotOverload: 4,      // сколько подряд в один лоток до перегрузки
   slotLockMs: 4200,     // на сколько лоток блокируется
 };
+
+// Реплики Карена при броске — аппаратная сатира.
+export const KAREN_LINES = [
+  'Это срочно!', 'Вчера ещё надо было.', 'Под мою ответственность.',
+  'Согласовано.', 'На контроль!', 'Кто, если не ты?', 'Освой бюджет.',
+  'Доложить к вечеру.', 'Без бумажки никуда.', 'Берёшь и делаешь.',
+  'Аппарат не спит.', 'Это не обсуждается.',
+];
+export const KAREN_LINES_ANGRY = [
+  'Я сказал — бегом!', 'Опять провал?!', 'Где дисциплина?!',
+  'Уволю к чёрту!', 'Шевелись!', 'Это саботаж!',
+];
+
+// Рекорд смены — в localStorage.
+export const getBest = () => +localStorage.getItem('apparat_best') || 0;
+export const saveBest = (s) => {
+  const best = getBest();
+  if (s > best) { localStorage.setItem('apparat_best', String(s)); return true; }
+  return false;
+};
