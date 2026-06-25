@@ -1,7 +1,7 @@
 // Основной игровой цикл: спавн поручений, ловля, маршрутизация,
 // настроение босса, частицы и реакция мира.
 import Phaser from 'phaser';
-import { W, H, PAL, HEX, DEPTS, BALANCE } from '../core/config.js';
+import { W, H, W_DESIGN, PAL, HEX, DEPTS, BALANCE } from '../core/config.js';
 import { buildOffice } from '../core/office.js';
 
 export default class GameScene extends Phaser.Scene {
@@ -29,7 +29,8 @@ export default class GameScene extends Phaser.Scene {
     this.karen = this.add.image(W / 2, 150, 'karen_idle').setScale(0.6).setDepth(20);
     this.player = this.add.image(W / 2, H - 200, 'sergey_catch').setScale(0.54).setDepth(35);
     this.player.y0 = this.player.y;
-    this.playerSpeed = 560;
+    // Скорость растёт с шириной поля — время на полный проход постоянно.
+    this.playerSpeed = Math.round(560 * W / W_DESIGN);
 
     this.buildParticles();
     this.buildHUD();
