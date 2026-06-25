@@ -1,15 +1,7 @@
 // Глобальные константы игры: размеры поля, палитра, департаменты.
 
-// Высота поля фиксирована, ширина подстраивается под пропорции экрана
-// (всегда «альбомные»), чтобы на телефоне не было чёрных полос по бокам.
+export const W = 1100;
 export const H = 780;
-export const W_DESIGN = 1100;            // эталон, под который настроен баланс
-
-const _w = (typeof window !== 'undefined') ? window.innerWidth : W_DESIGN;
-const _h = (typeof window !== 'undefined') ? window.innerHeight : H;
-const _long = Math.max(_w, _h), _short = Math.min(_w, _h);
-const _aspect = Math.min(Math.max(_long / _short, 1.3), 2.3);  // от 1.3:1 до 2.3:1
-export const W = Math.round(H * _aspect);
 
 // Палитра: тёплая корпоративная сатира.
 export const PAL = {
