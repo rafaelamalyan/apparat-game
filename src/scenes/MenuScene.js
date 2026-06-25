@@ -24,13 +24,13 @@ export default class MenuScene extends Phaser.Scene {
       this.add.text(W / 2, 250, '🏆 Лучшая карьера: дошёл до раунда ' + best,
         { font: '700 16px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
 
-    const k = this.add.image(W / 2 - 170, 430, 'karen_throw').setScale(0.7).setDepth(60);
-    const s = this.add.image(W / 2 + 170, 430, 'sergey_catch').setScale(0.66).setDepth(60);
+    const k = this.add.image(W / 2 - 200, 414, 'karen_throw').setScale(0.98).setDepth(60);
+    const s = this.add.image(W / 2 + 200, 414, 'sergey_catch').setScale(0.94).setDepth(60);
     this.tweens.add({ targets: k, y: '-=10', duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.tweens.add({ targets: s, y: '-=12', duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: 300 });
-    this.add.text(W / 2 - 170, 545, 'КАРЕН Г.  ·  генеральный',
+    this.add.text(W / 2 - 200, 566, 'КАРЕН Г.  ·  генеральный',
       { font: '600 15px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
-    this.add.text(W / 2 + 170, 545, 'СЕРЁГА  ·  Аппарат (вы)',
+    this.add.text(W / 2 + 200, 566, 'СЕРЁГА  ·  Аппарат (вы)',
       { font: '600 15px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
 
     const rules = [
