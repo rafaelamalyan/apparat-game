@@ -136,8 +136,6 @@ export default class GameScene extends Phaser.Scene {
     SFX.good();
     this.sparks.emitParticleAt(slot.x, slot.y - 20, 10);
     this.popSlot(slot);
-    slot.load++;
-    if (slot.load >= BALANCE.slotOverload && !slot.locked) { slot.locked = true; slot.lockT = this.time.now + BALANCE.slotLockMs; }
     if (this.olyaHeld.length === 0) this.olya.setTexture('olya_catch');
     this.refreshHUD();
   }
@@ -489,7 +487,11 @@ export default class GameScene extends Phaser.Scene {
     if (this.bonus && time > this.bonusUntil) this.endBonus();
 
     this.slots.forEach((s) => {
-      if (s.locked && time > s.lockT) { s.locked = false; s.load = 0; this.refreshHUD(); }
+      if (s.locked) {
+        if (time > s.lockT) { s.locked = false; s.load = 0; this.refreshHUD(); }
+      } else if (s.load > 0) {
+        s.load = Math.max(0, s.load - BALANCE.loadDecay * dt);   // счётчик остывает
+      }
     });
 
     if (Phaser.Input.Keyboard.JustDown(this.cursors.down) || Phaser.Input.Keyboard.JustDown(this.cursors.space)) {
