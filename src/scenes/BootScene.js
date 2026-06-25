@@ -10,6 +10,7 @@ export default class BootScene extends Phaser.Scene {
 
   preload() {
     for (const k of CHARS) this.load.image(k, `sprites/${k}.png`);
+    this.load.image('office', 'bg/office.jpg');
   }
 
   create() {
@@ -18,7 +19,12 @@ export default class BootScene extends Phaser.Scene {
     this.makeSpark();
     this.makeDust();
     this.makeVignette();
-    this.scene.start('Menu');
+    // Стартуем меню только когда шрифты загружены — иначе Phaser
+    // нарисует текст системным и не перерисует.
+    const fonts = [
+      '700 40px "PT Serif"', '400 16px "PT Sans"', '700 16px "PT Sans"',
+    ].map((f) => document.fonts.load(f));
+    Promise.all(fonts).catch(() => {}).finally(() => this.scene.start('Menu'));
   }
 
   // Цветная папка-поручение под департамент (или серая).

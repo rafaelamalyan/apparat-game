@@ -17,7 +17,7 @@ export default class ShopScene extends Phaser.Scene {
 
     // Заголовок + разбивка премии.
     this.add.text(W / 2, 40, 'РАУНД ' + r.round + ' СДАН',
-      { font: '900 40px Segoe UI', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 7);
+      { font: '700 40px "PT Serif"', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 4);
 
     const lines = [
       'Очки за раунд:  ' + r.score,
@@ -25,16 +25,16 @@ export default class ShopScene extends Phaser.Scene {
       ...(r.noLossBonus ? ['Без потерь:  +' + r.noLossBonus] : []),
     ];
     this.add.text(W / 2, 92, lines.join('     '),
-      { font: '600 17px Segoe UI', color: '#b8c2dc' }).setOrigin(0.5).setDepth(60);
+      { font: '600 17px PT Sans', color: '#b8c2dc' }).setOrigin(0.5).setDepth(60);
     this.add.text(W / 2, 124, '💰 ПРЕМИЯ:  +' + r.premia + ' ₽',
-      { font: '900 26px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(60);
+      { font: '900 26px PT Sans', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(60);
 
-    this.budgetT = this.add.text(W / 2, 168, '', { font: '800 24px Segoe UI', color: HEX(PAL.teal) })
+    this.budgetT = this.add.text(W / 2, 168, '', { font: '800 24px PT Sans', color: HEX(PAL.teal) })
       .setOrigin(0.5).setDepth(60);
     this.refreshBudget();
 
     this.add.text(W / 2, 206, 'М А Г А З И Н   У Л У Ч Ш Е Н И Й',
-      { font: '700 15px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(60);
+      { font: '700 15px PT Sans', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(60);
 
     // Карточки магазина — 2 столбца × 3 ряда.
     const cardW = 470, cardH = 116, gx = 250, gy = 296, dx = W - 500, dy = 132;
@@ -46,7 +46,7 @@ export default class ShopScene extends Phaser.Scene {
 
     // Кнопка «следующий раунд».
     const btn = this.add.text(W / 2, H - 46, 'СЛЕДУЮЩИЙ РАУНД  ▶',
-      { font: '800 26px Segoe UI', color: HEX(PAL.ink), backgroundColor: HEX(PAL.brass), padding: { x: 30, y: 13 } })
+      { font: '800 26px PT Sans', color: HEX(PAL.ink), backgroundColor: HEX(PAL.brass), padding: { x: 30, y: 13 } })
       .setOrigin(0.5).setDepth(60).setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => btn.setScale(1.05));
     btn.on('pointerout', () => btn.setScale(1));
@@ -61,11 +61,11 @@ export default class ShopScene extends Phaser.Scene {
   buildCard(item, cx, cy, cw, ch) {
     const lvl = () => run.upgrades[item.key];
     const bg = this.add.rectangle(0, 0, cw, ch, PAL.office2, 0.92).setStrokeStyle(2, PAL.brassDk);
-    const icon = this.add.text(-cw / 2 + 38, 0, item.icon, { font: '40px Segoe UI' }).setOrigin(0.5);
-    const name = this.add.text(-cw / 2 + 72, -30, item.name, { font: '800 20px Segoe UI', color: HEX(PAL.paper) }).setOrigin(0, 0.5);
-    const desc = this.add.text(-cw / 2 + 72, -4, item.desc, { font: '14px Segoe UI', color: '#9fb0d0' }).setOrigin(0, 0.5);
-    const dots = this.add.text(-cw / 2 + 72, 24, '', { font: '700 14px Segoe UI', color: HEX(PAL.teal) }).setOrigin(0, 0.5);
-    const price = this.add.text(cw / 2 - 20, 0, '', { font: '800 18px Segoe UI', color: HEX(PAL.brass) }).setOrigin(1, 0.5);
+    const icon = this.add.text(-cw / 2 + 38, 0, item.icon, { font: '40px PT Sans' }).setOrigin(0.5);
+    const name = this.add.text(-cw / 2 + 72, -30, item.name, { font: '800 20px PT Sans', color: HEX(PAL.paper) }).setOrigin(0, 0.5);
+    const desc = this.add.text(-cw / 2 + 72, -4, item.desc, { font: '14px PT Sans', color: '#9fb0d0' }).setOrigin(0, 0.5);
+    const dots = this.add.text(-cw / 2 + 72, 24, '', { font: '700 14px PT Sans', color: HEX(PAL.teal) }).setOrigin(0, 0.5);
+    const price = this.add.text(cw / 2 - 20, 0, '', { font: '800 18px PT Sans', color: HEX(PAL.brass) }).setOrigin(1, 0.5);
 
     const card = this.add.container(cx, cy, [bg, icon, name, desc, dots, price]).setDepth(60);
     card.setSize(cw, ch).setInteractive({ useHandCursor: true });

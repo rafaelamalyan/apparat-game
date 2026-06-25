@@ -71,7 +71,7 @@ export default class GameScene extends Phaser.Scene {
     this.olya.y0 = this.olya.y;
     this.olya.targetX = W / 2 + 150;
     this.olyaTag = this.add.text(this.olya.x, this.olya.y - 84, 'Оля',
-      { font: '700 13px Segoe UI', color: HEX(0xffb3d1) }).setOrigin(0.5).setDepth(34);
+      { font: '700 13px PT Sans', color: HEX(0xffb3d1) }).setOrigin(0.5).setDepth(34);
   }
 
   updateOlya(dt) {
@@ -150,7 +150,7 @@ export default class GameScene extends Phaser.Scene {
   // Кнопка-индикатор звука + переключение на M.
   setupSound() {
     this.soundT = this.add.text(W - 20, 44, isMuted() ? '🔇' : '🔊',
-      { font: '20px Segoe UI' }).setOrigin(1, 0).setDepth(46)
+      { font: '20px PT Sans' }).setOrigin(1, 0).setDepth(46)
       .setInteractive({ useHandCursor: true });
     const flip = () => this.soundT.setText(toggleMute() ? '🔇' : '🔊');
     this.soundT.on('pointerdown', (p, lx, ly, e) => { if (e) e.stopPropagation(); flip(); });
@@ -175,10 +175,10 @@ export default class GameScene extends Phaser.Scene {
     this.cameras.main.shake(220, 0.004);
 
     const b = this.add.text(W / 2, H * 0.42, 'КОНЕЦ КВАРТАЛА',
-      { font: '900 46px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(48);
-    b.setStroke(HEX(PAL.ink), 8);
+      { font: '700 46px "PT Serif"', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(48);
+    b.setStroke(HEX(PAL.ink), 4);
     const sub = this.add.text(W / 2, H * 0.42 + 46, 'ДВОЙНЫЕ ОЧКИ — ЛОВИ!',
-      { font: '800 22px Segoe UI', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(48);
+      { font: '800 22px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(48);
     [b, sub].forEach((o) => { o.setScale(0.5).setAlpha(0); });
     this.tweens.add({ targets: [b, sub], scale: 1, alpha: 1, duration: 260, ease: 'Back.out' });
     this.time.delayedCall(1600, () => this.tweens.add({
@@ -199,7 +199,7 @@ export default class GameScene extends Phaser.Scene {
     const pool = angry ? KAREN_LINES_ANGRY : KAREN_LINES;
     const txt = Phaser.Utils.Array.GetRandom(pool);
     const label = this.add.text(0, 0, txt,
-      { font: '700 16px Segoe UI', color: HEX(angry ? PAL.red : PAL.ink) }).setOrigin(0.5);
+      { font: '700 16px PT Sans', color: HEX(angry ? PAL.red : PAL.ink) }).setOrigin(0.5);
     const pad = 12, bw = label.width + pad * 2, bh = label.height + pad;
     const bg = this.add.graphics();
     bg.fillStyle(PAL.paper, 1); bg.fillRoundedRect(-bw / 2, -bh / 2, bw, bh, 9);
@@ -254,11 +254,11 @@ export default class GameScene extends Phaser.Scene {
       base.fillStyle(d.light, 0.5); base.fillRoundedRect(-slotW / 2 + 14, -30, slotW - 28, 8, 12);
       tray.add(base);
       const ic = this.add.text(-slotW / 2 + 44, 4, d.ic,
-        { font: 'bold 30px Segoe UI', color: HEX(PAL.ivory) }).setOrigin(0.5);
+        { font: 'bold 30px PT Sans', color: HEX(PAL.ivory) }).setOrigin(0.5);
       const nm = this.add.text(8, -6, d.name,
-        { font: '800 20px Segoe UI', color: HEX(PAL.ivory) }).setOrigin(0.5);
+        { font: '800 20px PT Sans', color: HEX(PAL.ivory) }).setOrigin(0.5);
       const cap = this.add.text(8, 18, 'свободен',
-        { font: '13px Segoe UI', color: HEX(PAL.ivory) }).setOrigin(0.5).setAlpha(0.8);
+        { font: '13px PT Sans', color: HEX(PAL.ivory) }).setOrigin(0.5).setAlpha(0.8);
       tray.add([ic, nm, cap]);
       this.slots.push({ ...d, x: cx, y: cy, w: slotW - 28, tray, base, cap, load: 0, locked: false, lockT: 0 });
     });
@@ -281,11 +281,11 @@ export default class GameScene extends Phaser.Scene {
 
   buildHUD() {
     this.add.rectangle(0, 0, W, 52, PAL.ink, 0.55).setOrigin(0).setDepth(45);
-    this.scoreT = this.add.text(20, 12, '', { font: '800 26px Segoe UI', color: HEX(PAL.ivory) }).setDepth(46);
-    this.comboT = this.add.text(20, 38, '', { font: '700 14px Segoe UI', color: HEX(PAL.teal) }).setDepth(46);
-    this.x2T = this.add.text(W / 2, 50, '', { font: '900 16px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5, 0).setDepth(46);
-    this.livesT = this.add.text(W - 20, 14, '', { font: '900 24px Segoe UI', color: HEX(PAL.red) }).setOrigin(1, 0).setDepth(46);
-    this.roundT = this.add.text(W / 2, 6, '', { font: '800 15px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5, 0).setDepth(46);
+    this.scoreT = this.add.text(20, 12, '', { font: '800 26px PT Sans', color: HEX(PAL.ivory) }).setDepth(46);
+    this.comboT = this.add.text(20, 38, '', { font: '700 14px PT Sans', color: HEX(PAL.teal) }).setDepth(46);
+    this.x2T = this.add.text(W / 2, 50, '', { font: '900 16px PT Sans', color: HEX(PAL.brass) }).setOrigin(0.5, 0).setDepth(46);
+    this.livesT = this.add.text(W - 20, 14, '', { font: '900 24px PT Sans', color: HEX(PAL.red) }).setOrigin(1, 0).setDepth(46);
+    this.roundT = this.add.text(W / 2, 6, '', { font: '800 15px PT Sans', color: HEX(PAL.brass) }).setOrigin(0.5, 0).setDepth(46);
     const mf = this.add.graphics().setDepth(46);
     mf.fillStyle(PAL.ink, 1); mf.fillRoundedRect(W / 2 - 130, 28, 260, 14, 7);
     mf.lineStyle(2, PAL.brassDk, 1); mf.strokeRoundedRect(W / 2 - 130, 28, 260, 14, 7);
@@ -322,7 +322,7 @@ export default class GameScene extends Phaser.Scene {
     badge.fillStyle(0x0d1424, 0.85); badge.fillCircle(0, -34, 15);
     badge.fillStyle(tint, 1); badge.fillCircle(0, -34, 12);
     badge.lineStyle(2.5, lite, 1); badge.strokeCircle(0, -34, 14);
-    const ic = this.add.text(0, -34, grey ? '?' : dept.ic, { font: 'bold 16px Segoe UI', color: '#fff' }).setOrigin(0.5);
+    const ic = this.add.text(0, -34, grey ? '?' : dept.ic, { font: 'bold 16px PT Sans', color: '#fff' }).setOrigin(0.5);
     const arc = this.add.graphics();
     cont.add([badge, spr, ic, arc]);
     cont.setScale(0.6);
@@ -401,7 +401,7 @@ export default class GameScene extends Phaser.Scene {
 
   flash(msg, color) {
     const t = this.add.text(this.player.x, this.player.y - 110, msg,
-      { font: '800 19px Segoe UI', color }).setOrigin(0.5).setDepth(48);
+      { font: '800 19px PT Sans', color }).setOrigin(0.5).setDepth(48);
     t.setStroke('#0d1424', 5);
     this.tweens.add({ targets: t, y: t.y - 42, alpha: 0, duration: 820, ease: 'Quad.out', onComplete: () => t.destroy() });
   }
