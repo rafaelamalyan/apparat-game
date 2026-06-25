@@ -18,12 +18,16 @@ export default class GameScene extends Phaser.Scene {
     this.over = false;
     this.fallBase = BALANCE.fallBase;
     this.combo = 0;
+    this.bonus = false;                       // идёт ли бонус-волна
+    this.bonusUntil = 0;
+    this.nextQuarter = BALANCE.quarterEvery;   // следующий порог очков для волны
 
     const office = buildOffice(this);
     this.city = office.city;
 
-    // Красный «свет ярости» поверх сцены + виньетка.
+    // Красный «свет ярости» + золотой «свет аврала» поверх сцены + виньетка.
     this.rage = this.add.rectangle(W / 2, H / 2, W, H, PAL.red, 0).setDepth(40);
+    this.gold = this.add.rectangle(W / 2, H / 2, W, H, PAL.brass, 0).setDepth(40);
     this.add.image(0, 0, 'vig').setOrigin(0).setDepth(41);
 
     this.buildTrays();
@@ -54,6 +58,42 @@ export default class GameScene extends Phaser.Scene {
     const flip = () => this.soundT.setText(toggleMute() ? '🔇' : '🔊');
     this.soundT.on('pointerdown', (p, lx, ly, e) => { if (e) e.stopPropagation(); flip(); });
     this.input.keyboard.on('keydown-M', flip);
+  }
+
+  // Бонус-волна «конец квартала»: аврал + двойные очки на несколько секунд.
+  checkQuarter() {
+    if (!this.bonus && this.score >= this.nextQuarter) {
+      this.nextQuarter += BALANCE.quarterEvery;
+      this.startBonus();
+    }
+  }
+
+  startBonus() {
+    this.bonus = true;
+    this.bonusUntil = this.time.now + BALANCE.bonusMs;
+    SFX.bonus();
+    this.tweens.killTweensOf(this.gold);
+    this.tweens.add({ targets: this.gold, alpha: 0.22, duration: 320, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.x2T.setText('🔥 АВРАЛ · ОЧКИ ×2');
+    this.cameras.main.shake(220, 0.004);
+
+    const b = this.add.text(W / 2, H * 0.42, 'КОНЕЦ КВАРТАЛА',
+      { font: '900 46px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5).setDepth(48);
+    b.setStroke(HEX(PAL.ink), 8);
+    const sub = this.add.text(W / 2, H * 0.42 + 46, 'ДВОЙНЫЕ ОЧКИ — ЛОВИ!',
+      { font: '800 22px Segoe UI', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(48);
+    [b, sub].forEach((o) => { o.setScale(0.5).setAlpha(0); });
+    this.tweens.add({ targets: [b, sub], scale: 1, alpha: 1, duration: 260, ease: 'Back.out' });
+    this.time.delayedCall(1600, () => this.tweens.add({
+      targets: [b, sub], alpha: 0, y: '-=24', duration: 360,
+      onComplete: () => { b.destroy(); sub.destroy(); } }));
+  }
+
+  endBonus() {
+    this.bonus = false;
+    this.x2T.setText('');
+    this.tweens.killTweensOf(this.gold);
+    this.tweens.add({ targets: this.gold, alpha: 0, duration: 400 });
   }
 
   // Облачко с репликой Карена при броске.
@@ -146,6 +186,7 @@ export default class GameScene extends Phaser.Scene {
     this.add.rectangle(0, 0, W, 52, PAL.ink, 0.55).setOrigin(0).setDepth(45);
     this.scoreT = this.add.text(20, 12, '', { font: '800 26px Segoe UI', color: HEX(PAL.ivory) }).setDepth(46);
     this.comboT = this.add.text(20, 38, '', { font: '700 14px Segoe UI', color: HEX(PAL.teal) }).setDepth(46);
+    this.x2T = this.add.text(W / 2, 50, '', { font: '900 16px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5, 0).setDepth(46);
     this.livesT = this.add.text(W - 20, 14, '', { font: '900 24px Segoe UI', color: HEX(PAL.red) }).setOrigin(1, 0).setDepth(46);
     this.add.text(W / 2, 8, 'НАСТРОЕНИЕ БОССА', { font: '700 12px Segoe UI', color: HEX(PAL.brass) }).setOrigin(0.5, 0).setDepth(46);
     const mf = this.add.graphics().setDepth(46);
@@ -157,7 +198,9 @@ export default class GameScene extends Phaser.Scene {
   scheduleSpawn() {
     if (this.over) return;
     const m = this.mood / 100;
-    const d = Phaser.Math.Linear(BALANCE.spawnSlow, BALANCE.spawnFast, m);
+    const d = this.bonus
+      ? BALANCE.bonusSpawnMs
+      : Phaser.Math.Linear(BALANCE.spawnSlow, BALANCE.spawnFast, m);
     this.time.delayedCall(d, () => { this.spawn(); this.scheduleSpawn(); });
   }
 
@@ -222,16 +265,19 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: t.cont, x: slot.x, y: slot.y - 10, scale: 0.5, alpha: 0, duration: 170, onComplete: () => t.cont.destroy() });
     const ok = t.grey || t.dept.key === slot.key;
 
+    const mult = this.bonus ? 2 : 1;
     if (t.grey) {
-      this.score += 12; this.mood = Math.max(0, this.mood - 3); this.combo++;
+      const g = 12 * mult;
+      this.score += g; this.mood = Math.max(0, this.mood - 3); this.combo++;
       SFX.good();
-      this.flash('+12 ПРИСТРОИЛ', HEX(slot.light)); slot.load++; this.popSlot(slot);
+      this.flash('+' + g + ' ПРИСТРОИЛ', HEX(slot.light)); slot.load++; this.popSlot(slot);
     } else if (ok) {
       this.combo++;
       const b = Math.min(this.combo, 5) * 2;
-      this.score += 10 + b; this.mood = Math.max(0, this.mood - 5);
+      const gain = (10 + b) * mult;
+      this.score += gain; this.mood = Math.max(0, this.mood - 5);
       if (this.combo > 1) SFX.combo(this.combo); else SFX.good();
-      this.flash('+' + (10 + b) + (this.combo > 1 ? '  СЕРИЯ x' + this.combo : ''), HEX(slot.light));
+      this.flash('+' + gain + (this.combo > 1 ? '  СЕРИЯ x' + this.combo : ''), HEX(slot.light));
       slot.load++;
       this.sparks.emitParticleAt(slot.x, slot.y - 20, 14);
       this.popSlot(slot);
@@ -249,6 +295,7 @@ export default class GameScene extends Phaser.Scene {
     }
     this.layoutHeld();
     this.refreshHUD();
+    this.checkQuarter();
   }
 
   popSlot(slot) { this.tweens.add({ targets: slot.tray, y: slot.y - 6, duration: 90, yoyo: true }); }
@@ -328,6 +375,8 @@ export default class GameScene extends Phaser.Scene {
         this.loseLife('УРОНИЛ!');
       }
     }
+
+    if (this.bonus && time > this.bonusUntil) this.endBonus();
 
     this.slots.forEach((s) => {
       if (s.locked && time > s.lockT) { s.locked = false; s.load = 0; this.refreshHUD(); }

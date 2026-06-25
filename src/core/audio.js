@@ -44,6 +44,8 @@ export const SFX = {
                   tone({ freq: 160, slideTo: 90,  dur: 0.4, type: 'sawtooth', vol: 0.12 }); },
   over:   () => { tone({ freq: 300, slideTo: 90, dur: 0.7, type: 'sawtooth', vol: 0.2 }); },
   record: () => { [0, 1, 2, 3].forEach((i) => tone({ freq: 523 * Math.pow(1.26, i), dur: 0.14, type: 'square', vol: 0.18, delay: i * 0.1 })); },
+  bonus:  () => { [0, 1, 2, 3, 4].forEach((i) => tone({ freq: 392 * Math.pow(1.22, i), dur: 0.12, type: 'triangle', vol: 0.18, delay: i * 0.07 }));
+                  tone({ freq: 784, dur: 0.5, type: 'square', vol: 0.14, delay: 0.35 }); },
 };
 
 export function toggleMute() {
