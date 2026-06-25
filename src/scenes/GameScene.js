@@ -61,17 +61,17 @@ export default class GameScene extends Phaser.Scene {
     this.refreshHUD();
   }
 
-  // Помощница Оля — автономный второй ловец (плейсхолдер: тонированный спрайт).
+  // Помощница Оля — автономный второй ловец.
   spawnOlya(level) {
     this.olyaSpeed = 360 + level * 80;
     this.olyaMaxHeld = 2 + level;            // вместимость рук Оли
     this.olyaHeld = [];
-    this.olya = this.add.image(W / 2 + 150, H - 196, 'sergey_catch')
-      .setScale(0.46).setDepth(34).setTint(0xff9ec8);     // розоватый оттенок
+    this.olya = this.add.image(W / 2 + 150, H - 195, 'olya_catch')
+      .setScale(0.50).setDepth(34);
     this.olya.y0 = this.olya.y;
     this.olya.targetX = W / 2 + 150;
-    this.olyaTag = this.add.text(this.olya.x, this.olya.y - 96, 'Оля',
-      { font: '700 13px Segoe UI', color: HEX(0xff9ec8) }).setOrigin(0.5).setDepth(34);
+    this.olyaTag = this.add.text(this.olya.x, this.olya.y - 84, 'Оля',
+      { font: '700 13px Segoe UI', color: HEX(0xffb3d1) }).setOrigin(0.5).setDepth(34);
   }
 
   updateOlya(dt) {
@@ -91,7 +91,7 @@ export default class GameScene extends Phaser.Scene {
     if (Math.abs(ddx) > step) { o.x += Math.sign(ddx) * step; o.setFlipX(ddx < 0); }
     o.x = Phaser.Math.Clamp(o.x, 60, W - 60);
     o.y = o.y0 + Math.sin(this.time.now / 280 + 1) * 3;
-    this.olyaTag.setPosition(o.x, o.y - 96);
+    this.olyaTag.setPosition(o.x, o.y - 84);
     this.layoutOlyaHeld();
 
     if (this.olyaHeld.length < this.olyaMaxHeld) {
@@ -123,7 +123,7 @@ export default class GameScene extends Phaser.Scene {
     t.caught = true;
     this.tasks = this.tasks.filter((x) => x !== t);
     this.olyaHeld.push(t);
-    this.olya.setTexture('sergey_carry').setTint(0xff9ec8);
+    this.olya.setTexture('olya_carry');
     SFX.catch();
     this.sparks.emitParticleAt(this.olya.x, this.olya.y - 46, 6);
   }
@@ -138,7 +138,7 @@ export default class GameScene extends Phaser.Scene {
     this.popSlot(slot);
     slot.load++;
     if (slot.load >= BALANCE.slotOverload && !slot.locked) { slot.locked = true; slot.lockT = this.time.now + BALANCE.slotLockMs; }
-    if (this.olyaHeld.length === 0) this.olya.setTexture('sergey_catch').setTint(0xff9ec8);
+    if (this.olyaHeld.length === 0) this.olya.setTexture('olya_catch');
     this.refreshHUD();
   }
 
