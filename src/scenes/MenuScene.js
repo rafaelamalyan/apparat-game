@@ -24,24 +24,24 @@ export default class MenuScene extends Phaser.Scene {
       this.add.text(W / 2, 250, '🏆 Лучшая карьера: дошёл до раунда ' + best,
         { font: '700 16px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
 
-    const k = this.add.image(W / 2 - 200, 414, 'karen_throw').setScale(0.98).setDepth(60);
-    const s = this.add.image(W / 2 + 200, 414, 'sergey_catch').setScale(0.94).setDepth(60);
+    const k = this.add.image(W / 2 - 210, 416, 'karen_throw').setScale(1.15).setDepth(60);
+    const s = this.add.image(W / 2 + 210, 416, 'sergey_catch').setScale(1.10).setDepth(60);
     this.tweens.add({ targets: k, y: '-=10', duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.tweens.add({ targets: s, y: '-=12', duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: 300 });
-    this.add.text(W / 2 - 200, 566, 'ШЕФ  ·  генеральный',
-      { font: '600 15px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
-    this.add.text(W / 2 + 200, 566, 'СЕРЁГА  ·  Аппарат (вы)',
-      { font: '600 15px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
+    this.add.text(W / 2 - 210, 598, 'ШЕФ  ·  генеральный',
+      { font: '700 15px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
+    this.add.text(W / 2 + 210, 598, 'СЕРЁГА  ·  Аппарат (вы)',
+      { font: '700 15px PT Sans', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60);
 
     const rules = [
       'Лови поручения Серёгой и сгружай в департамент по ЦВЕТУ папки.',
       'Раунд идёт на время. В конце — премия за работу; трать её в магазине на улучшения.',
       'Отпуск, помощница Оля и не только. Кончились жизни — карьера окончена.',
     ];
-    rules.forEach((r, i) => this.add.text(W / 2, 590 + i * 26, r,
-      { font: '15px PT Sans', color: '#b8c2dc' }).setOrigin(0.5).setDepth(60));
+    rules.forEach((r, i) => this.add.text(W / 2, 624 + i * 23, r,
+      { font: '15px PT Sans', color: '#cdd6e6' }).setOrigin(0.5).setDepth(60));
 
-    const btn = this.add.text(W / 2, 700, 'НАЧАТЬ КАРЬЕРУ  ▶',
+    const btn = this.add.text(W / 2, 720, 'НАЧАТЬ КАРЬЕРУ  ▶',
       { font: '800 28px PT Sans', color: HEX(PAL.ink), backgroundColor: HEX(PAL.brass), padding: { x: 32, y: 14 } })
       .setOrigin(0.5).setDepth(60).setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => { btn.setScale(1.05); btn.setBackgroundColor(HEX(0xf4c46a)); });
