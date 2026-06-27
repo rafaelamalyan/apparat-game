@@ -17,6 +17,7 @@ export default class BootScene extends Phaser.Scene {
       for (const p of FIGHTER_POSES) this.load.image(`${f}_${p}`, `sprites/fighters/${f}_${p}.png`);
     for (const fx of FX) this.load.image('fx_' + fx, `sprites/fx/${fx}.png`);
     this.load.image('office', 'bg/office.jpg');
+    this.load.image('arena', 'bg/arena.jpg');
   }
 
   create() {

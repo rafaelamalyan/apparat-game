@@ -3,7 +3,6 @@
 // Соперник пока — зеркальный Серёга (плейсхолдер вместо «Проверки СВА»).
 import Phaser from 'phaser';
 import { W, H, PAL, HEX } from '../core/config.js';
-import { buildOffice } from '../core/office.js';
 import { SFX } from '../core/audio.js';
 
 const GROUND = H - 60;
@@ -47,7 +46,8 @@ export default class BattleScene extends Phaser.Scene {
   constructor() { super('Battle'); }
 
   create() {
-    buildOffice(this);
+    this.add.image(0, 0, 'arena').setOrigin(0).setDepth(0).setDisplaySize(W, H);
+    this.add.rectangle(0, 0, W, H, 0x140c04, 0.20).setOrigin(0).setDepth(1);  // лёгкий скрим
     this.add.image(0, 0, 'vig').setOrigin(0).setDepth(41);
 
     this.p1 = new Fighter(this, W * 0.34, 'seryoga', true, true, null);   // Серёга смотрит вправо
