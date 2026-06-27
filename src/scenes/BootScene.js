@@ -5,13 +5,17 @@ import { W, H, DEPTS } from '../core/config.js';
 
 const CHARS = ['karen_idle', 'karen_throw', 'karen_angry', 'sergey_idle', 'sergey_catch', 'sergey_carry', 'olya_catch', 'olya_carry'];
 const FIGHTER_POSES = ['idle', 'light', 'heavy', 'special', 'hit', 'block', 'win', 'ko'];
+const FIGHTERS = ['seryoga', 'sva'];
+const FX = ['zapiska', 'nesoglasovano', 'dokladnaya', 'scissors', 'vygovor', 'akt', 'narushenie'];
 
 export default class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
   preload() {
     for (const k of CHARS) this.load.image(k, `sprites/${k}.png`);
-    for (const p of FIGHTER_POSES) this.load.image('seryoga_' + p, `sprites/fighters/seryoga_${p}.png`);
+    for (const f of FIGHTERS)
+      for (const p of FIGHTER_POSES) this.load.image(`${f}_${p}`, `sprites/fighters/${f}_${p}.png`);
+    for (const fx of FX) this.load.image('fx_' + fx, `sprites/fx/${fx}.png`);
     this.load.image('office', 'bg/office.jpg');
   }
 
