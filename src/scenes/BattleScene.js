@@ -65,6 +65,9 @@ export default class BattleScene extends Phaser.Scene {
     this.keyS = this.input.keyboard.addKey('S');
 
     this.over = false;
+    this.freeze = 0;     // hitstop: пауза кадра в момент удара
+    this.combo = 0;
+    this.lastHit = -9999;
     this.announce('ФАЙТ!', 900);
   }
 
@@ -82,6 +85,8 @@ export default class BattleScene extends Phaser.Scene {
     this.add.text(W - 34, 50, 'ПРОВЕРКА СВА', { font: '700 14px PT Sans', color: HEX(PAL.paper) }).setOrigin(1, 0).setDepth(46);
     this.bigT = this.add.text(W / 2, H * 0.32, '', { font: '700 60px "PT Serif"', color: HEX(PAL.brass) })
       .setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 5);
+    this.comboT = this.add.text(W / 2, 92, '', { font: '800 26px "PT Serif"', color: HEX(PAL.brass) })
+      .setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 4);
   }
 
   announce(txt, hold) {
@@ -107,6 +112,7 @@ export default class BattleScene extends Phaser.Scene {
 
   hit(att, def, m) {
     const blocked = def.blocking;
+    const heavy = m.dmg >= 18;
     this.showMoveFx(att, def, m);
     const dmg = blocked ? Math.round(m.dmg * 0.25) : m.dmg;
     def.hp = Math.max(0, def.hp - dmg);
@@ -116,11 +122,29 @@ export default class BattleScene extends Phaser.Scene {
     if (!blocked) { def.setPose('hit'); def.busy = true;
       this.time.delayedCall(260, () => { def.busy = false; if (!def.dead) def.setPose(def.blocking ? 'block' : 'idle'); });
     }
+    // вспышка попадания
+    def.sp.setTintFill(0xffffff);
+    this.time.delayedCall(70, () => { if (def.tint) def.sp.setTint(def.tint); else def.sp.clearTint(); });
+    // hitstop — заморозка кадра для «веса» удара
+    this.freeze = blocked ? 40 : (heavy ? 130 : 80);
     this.sparks(def.x, GROUND - 150, blocked);
-    this.cameras.main.shake(blocked ? 90 : 180, blocked ? 0.004 : 0.009);
+    this.cameras.main.shake(blocked ? 90 : (heavy ? 280 : 170), blocked ? 0.004 : (heavy ? 0.014 : 0.008));
     blocked ? SFX.bad() : SFX.life();
+    // комбо игрока
+    if (def === this.p1 && !blocked) { this.combo = 0; this.comboT.setText(''); }   // игрока ударили — сброс
+    if (att === this.p1 && !blocked) {
+      this.combo = (this.time.now - this.lastHit < 1300) ? this.combo + 1 : 1;
+      this.lastHit = this.time.now;
+      if (this.combo >= 2) this.showCombo();
+    }
     this.refreshHP();
     if (def.hp <= 0) this.knockout(def, att);
+  }
+
+  showCombo() {
+    this.comboT.setText('КОМБО × ' + this.combo).setScale(1.4).setAlpha(1);
+    this.tweens.killTweensOf(this.comboT);
+    this.tweens.add({ targets: this.comboT, scale: 1, duration: 180, ease: 'Back.out' });
   }
 
   sparks(x, y, blocked) {
@@ -175,6 +199,8 @@ export default class BattleScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this.over) return;
+    if (this.freeze > 0) { this.freeze -= delta; return; }   // hitstop
+    if (this.combo > 0 && time - this.lastHit > 1300) { this.combo = 0; this.comboT.setText(''); }
     const dt = delta / 1000;
     const p1 = this.p1, p2 = this.p2;
 
