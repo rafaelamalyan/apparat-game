@@ -474,11 +474,11 @@ export default class GameScene extends Phaser.Scene {
       if (left <= 0 && !t.caught) {
         t.caught = true; this.papers.emitParticleAt(t.cont.x, t.cont.y, 6);
         t.cont.destroy(); this.tasks = this.tasks.filter((x) => x !== t);
-        this.loseLife('ПРОСРОЧЕНО!');
+        if (!this.bonus) this.loseLife('ПРОСРОЧЕНО!');   // в аврал промах без штрафа
       } else if (t.cont.y > H - 26 && !t.caught) {
         t.caught = true; this.papers.emitParticleAt(t.cont.x, t.cont.y, 6);
         t.cont.destroy(); this.tasks = this.tasks.filter((x) => x !== t);
-        this.loseLife('УРОНИЛ!');
+        if (!this.bonus) this.loseLife('УРОНИЛ!');
       }
     }
 
