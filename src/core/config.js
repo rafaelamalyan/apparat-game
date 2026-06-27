@@ -68,7 +68,7 @@ export const ARENAS = [
 export const OPPONENTS = [
   { key: 'sva',  name: 'Проверка СВА',         tag: 'Внутренний аудит',    nativeRight: false, available: true },
   { key: 'gov',  name: 'Аппарат Правительства', tag: 'Тяжеловес сверху',   nativeRight: false, available: true },
-  { key: 'sp',   name: 'Счётная палата',        tag: 'Внешний госаудит',    nativeRight: false, available: false },
+  { key: 'sp',   name: 'Счётная палата',        tag: 'Внешний госаудит',    nativeRight: false, available: true },
   { key: 'prok', name: 'Прокуратура',           tag: 'Силовое давление',    nativeRight: false, available: false },
 ];
 export const opponentByKey = (k) => OPPONENTS.find((o) => o.key === k) || OPPONENTS[0];
