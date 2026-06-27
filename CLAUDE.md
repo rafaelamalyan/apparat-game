@@ -63,6 +63,26 @@ public/
   В портретной ориентации `index.html` показывает «поверни телефон».
 - Опубликовано на GitHub Pages, авто-деплой через `.github/workflows/deploy.yml`.
 
+## Режим «Аппаратная дуэль» (файтинг)
+- **Бойцы — data-driven.** Единый источник правды: `src/core/fighters.js`
+  (объект `FIGHTERS`). Новый боец = новая запись + спрайты
+  `public/sprites/fighters/<key>_<pose>.png` (позы: idle, light, heavy,
+  special, hit, block, win, ko). Поля: `stats` (maxHealth, attackPower,
+  defense, speed, weight), `moves.light/heavy`, `archetype`, `aiProfile`,
+  `nativeRight` (в какую сторону смотрит исходный спрайт), `available`,
+  `uniqueMechanic`. Игрок — `seryoga` (playable). `OPPONENTS` = все не-playable.
+- **Баланс файтинга** — `src/core/balance.js`: `FIGHT` (урон ульты, блок,
+  hitstop, тряска, метр) и `AI_PROFILES` (поведение ИИ по архетипу).
+- **ИИ по архетипу** — `BattleScene.ai()` читает `AI_PROFILES[cfg.aiProfile]`:
+  boss прёт и бьёт тяжело, defensive держит дистанцию и блокирует,
+  counter ставит блок и наказывает (`punish`), aggressive рашит.
+  Профиль задаёт range/approach/aggression/heavy/block/reactBlock/retreat/cool.
+- **Логика боя** — `src/scenes/BattleScene.js`: класс `Fighter` собирается из
+  cfg; ходьба, лёгкий/тяжёлый удар, блок, супер-метр + ульта «На проверку ДЭБ»,
+  KO с добиванием. Арены — `ARENAS` в config.js, фоны `public/bg/<key>.jpg`.
+- **Экраны** — `OpponentSelectScene` (выбор соперника, лестница карьеры),
+  `ArenaSelectScene` (выбор арены). Заход: меню → «В ЗАРУБУ».
+
 ## Заметки
 - **Спрайт Оли — плейсхолдер** (тонированный розовым `sergey_catch`). При
   появлении настоящего арта — класть `public/sprites/olya_*.png` и заменить

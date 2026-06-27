@@ -1,6 +1,7 @@
 // Выбор соперника перед «зарубой».
 import Phaser from 'phaser';
-import { W, H, PAL, HEX, OPPONENTS } from '../core/config.js';
+import { W, H, PAL, HEX } from '../core/config.js';
+import { OPPONENTS } from '../core/fighters.js';
 
 export default class OpponentSelectScene extends Phaser.Scene {
   constructor() { super('OpponentSelect'); }

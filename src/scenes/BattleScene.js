@@ -2,46 +2,36 @@
 // два бойца, полоски «Позиции», ходьба, лёгкий/тяжёлый удар, блок, ИИ, KO.
 // Соперник пока — зеркальный Серёга (плейсхолдер вместо «Проверки СВА»).
 import Phaser from 'phaser';
-import { W, H, PAL, HEX, ARENAS, OPPONENTS, opponentByKey } from '../core/config.js';
+import { W, H, PAL, HEX, ARENAS } from '../core/config.js';
 import { SFX } from '../core/audio.js';
 import { run, saveBestRound } from '../core/run.js';
+import { getFighter, opponentByKey, careerOpponent } from '../core/fighters.js';
+import { FIGHT, AI_PROFILES } from '../core/balance.js';
 
 const GROUND = H - 60;
-const SERYOGA_MOVES = {
-  light: { pose: 'light', dmg: 7,  reach: 185, active: 110, recover: 240, push: 45,  fx: 'fx_zapiska',  fxKind: 'fly',  label: 'Служебная записка!' },
-  heavy: { pose: 'heavy', dmg: 20, reach: 205, active: 230, recover: 480, push: 110, fx: 'fx_scissors', fxKind: 'slam', label: 'Срезать премию!' },
-};
-const SVA_MOVES = {
-  light: { pose: 'light', dmg: 7,  reach: 190, active: 120, recover: 250, push: 45,  fx: 'fx_akt',        fxKind: 'fly',  label: 'Акт проверки!' },
-  heavy: { pose: 'heavy', dmg: 20, reach: 205, active: 240, recover: 490, push: 110, fx: 'fx_narushenie', fxKind: 'slam', label: 'Нарушение!' },
-};
 
-// Соперник для дуэли карьеры — по лестнице доступных, раунды 3,6,9…
-const careerOpponent = (round) => {
-  const avail = OPPONENTS.filter((o) => o.available);
-  const idx = Math.max(0, Math.floor(round / 3) - 1);
-  return avail[idx % avail.length];
-};
-
+// Боец, собранный из конфига (см. core/fighters.js).
 class Fighter {
-  constructor(scene, x, prefix, faceRight, nativeRight, tint) {
-    this.scene = scene; this.prefix = prefix; this.faceRight = faceRight;
-    this.nativeRight = nativeRight !== false;   // в какую сторону смотрит сам спрайт
-    this.hp = 100; this.x = x; this.busy = false; this.blocking = false; this.dead = false;
-    this.cool = 0;
-    this.sp = scene.add.image(x, GROUND, prefix + '_idle').setOrigin(0.5, 1).setDepth(20);
-    this.scale = 300 / this.sp.height;
-    this.sp.setScale(this.scale);
-    if (tint) this.sp.setTint(tint);
-    this.tint = tint;
+  constructor(scene, x, cfg, faceRight) {
+    this.scene = scene; this.cfg = cfg;
+    this.prefix = cfg.key;
+    this.faceRight = faceRight;
+    this.nativeRight = cfg.nativeRight !== false;
+    const s = cfg.stats;
+    this.maxHealth = s.maxHealth; this.hp = s.maxHealth;
+    this.attackPower = s.attackPower; this.defense = s.defense;
+    this.speed = s.speed; this.weight = s.weight;
+    this.moves = cfg.moves;
+    this.x = x; this.busy = false; this.blocking = false; this.dead = false; this.cool = 0;
+    this.aiRetreat = 0; this.counterReady = false;   // состояние ИИ (фаза 2)
+    this.pose = 'idle';
+    this.sp = scene.add.image(x, GROUND, this.prefix + '_idle').setOrigin(0.5, 1).setDepth(20);
+    this.sp.setScale(300 / this.sp.height);
+    this.tint = null;
     this.applyFace();
   }
   applyFace() { this.sp.setFlipX(this.faceRight !== this.nativeRight); }
-  setPose(p) {
-    this.sp.setTexture(this.prefix + '_' + p);
-    if (this.tint) this.sp.setTint(this.tint);
-    this.applyFace();
-  }
+  setPose(p) { this.pose = p; this.sp.setTexture(this.prefix + '_' + p); this.applyFace(); }
   place() { this.sp.x = this.x; }
   move(dx) {
     if (this.busy || this.dead) return;
@@ -63,13 +53,11 @@ export default class BattleScene extends Phaser.Scene {
     this.add.rectangle(0, 0, W, H, 0x140c04, 0.20).setOrigin(0).setDepth(1);  // лёгкий скрим
     this.add.image(0, 0, 'vig').setOrigin(0).setDepth(41);
 
-    // Соперник: выбранный → иначе по лестнице карьеры → иначе СВА.
+    // Соперник: выбранный → иначе по лестнице карьеры → иначе первый доступный.
     this.opp = this.career ? careerOpponent(run.round)
       : opponentByKey(data && data.opponent);
-    this.p1 = new Fighter(this, W * 0.34, 'seryoga', true, true, null);
-    this.p2 = new Fighter(this, W * 0.66, this.opp.key, false, this.opp.nativeRight, null);
-    this.p1.moves = SERYOGA_MOVES;
-    this.p2.moves = SVA_MOVES;   // пока общий набор приёмов для всех соперников
+    this.p1 = new Fighter(this, W * 0.34, getFighter('seryoga'), true);
+    this.p2 = new Fighter(this, W * 0.66, this.opp, false);
 
     this.buildHUD();
 
@@ -139,43 +127,45 @@ export default class BattleScene extends Phaser.Scene {
   hit(att, def, m) {
     const blocked = def.blocking;
     const heavy = m.dmg >= 18;
+    // ИИ-контратакёр (СВА) зарядил наказание после удачного блока
+    if (blocked && def !== this.p1 && (AI_PROFILES[def.cfg.aiProfile] || {}).punish) def.counterReady = true;
     this.showMoveFx(att, def, m);
-    const dmg = blocked ? Math.round(m.dmg * 0.25) : m.dmg;
+    // урон = сила бьющего × защита получающего × (блок)
+    let dmg = m.dmg * att.attackPower * def.defense;
+    if (blocked) dmg *= FIGHT.blockMult;
+    dmg = Math.max(1, Math.round(dmg));
     def.hp = Math.max(0, def.hp - dmg);
     const dir = att.faceRight ? 1 : -1;
-    def.x = Phaser.Math.Clamp(def.x + dir * (blocked ? m.push * 0.4 : m.push), 120, W - 120);
+    const push = (blocked ? m.push * 0.4 : m.push) / def.weight;   // тяжёлых отбрасывает меньше
+    def.x = Phaser.Math.Clamp(def.x + dir * push, 120, W - 120);
     def.place();
     if (!blocked) { def.setPose('hit'); def.busy = true;
       this.time.delayedCall(260, () => { def.busy = false; if (!def.dead) def.setPose(def.blocking ? 'block' : 'idle'); });
     }
-    // вспышка попадания
     def.sp.setTintFill(0xffffff);
-    this.time.delayedCall(70, () => { if (def.tint) def.sp.setTint(def.tint); else def.sp.clearTint(); });
-    // hitstop — заморозка кадра для «веса» удара
-    this.freeze = blocked ? 40 : (heavy ? 130 : 80);
+    this.time.delayedCall(70, () => def.sp.clearTint());
+    this.freeze = blocked ? FIGHT.hitstop.blocked : (heavy ? FIGHT.hitstop.heavy : FIGHT.hitstop.light);
     this.sparks(def.x, GROUND - 150, blocked);
-    this.cameras.main.shake(blocked ? 90 : (heavy ? 280 : 170), blocked ? 0.004 : (heavy ? 0.014 : 0.008));
+    this.cameras.main.shake(blocked ? FIGHT.shake.blocked : (heavy ? FIGHT.shake.heavy : FIGHT.shake.light), blocked ? 0.004 : (heavy ? 0.014 : 0.008));
     blocked ? SFX.bad() : SFX.life();
-    // комбо игрока
     if (def === this.p1 && !blocked) { this.combo = 0; this.comboT.setText(''); }   // игрока ударили — сброс
     if (att === this.p1 && !blocked) {
-      this.combo = (this.time.now - this.lastHit < 1300) ? this.combo + 1 : 1;
+      this.combo = (this.time.now - this.lastHit < FIGHT.comboWindowMs) ? this.combo + 1 : 1;
       this.lastHit = this.time.now;
       if (this.combo >= 2) this.showCombo();
     }
-    // супер-метр копится: бьющий больше, получающий меньше
-    if (att === this.p1) this.meter1 = Math.min(100, this.meter1 + 12); else this.meter2 = Math.min(100, this.meter2 + 12);
-    if (def === this.p1) this.meter1 = Math.min(100, this.meter1 + 8);  else this.meter2 = Math.min(100, this.meter2 + 8);
+    if (att === this.p1) this.meter1 = Math.min(FIGHT.meterFull, this.meter1 + FIGHT.meterOnHit); else this.meter2 = Math.min(FIGHT.meterFull, this.meter2 + FIGHT.meterOnHit);
+    if (def === this.p1) this.meter1 = Math.min(FIGHT.meterFull, this.meter1 + FIGHT.meterOnTaken); else this.meter2 = Math.min(FIGHT.meterFull, this.meter2 + FIGHT.meterOnTaken);
     this.refreshMeter();
     this.refreshHP();
     if (def.hp <= 0) this.knockout(def, att);
   }
 
   refreshMeter() {
-    this.mb1.width = Math.max(1, this.meter1 / 100 * (460 - 2));
-    this.mb2.width = Math.max(1, this.meter2 / 100 * (460 - 2));
-    this.mb1.fillColor = this.meter1 >= 100 ? PAL.red : PAL.brass;
-    this.mb2.fillColor = this.meter2 >= 100 ? PAL.red : PAL.brass;
+    this.mb1.width = Math.max(1, this.meter1 / FIGHT.meterFull * (460 - 2));
+    this.mb2.width = Math.max(1, this.meter2 / FIGHT.meterFull * (460 - 2));
+    this.mb1.fillColor = this.meter1 >= FIGHT.meterFull ? PAL.red : PAL.brass;
+    this.mb2.fillColor = this.meter2 >= FIGHT.meterFull ? PAL.red : PAL.brass;
   }
 
   showCombo() {
@@ -244,14 +234,14 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   ultaHit(att, def) {
-    def.hp = Math.max(0, def.hp - 50);
+    def.hp = Math.max(0, def.hp - Math.round(FIGHT.ultaDamage * def.defense));
     const dir = att.faceRight ? 1 : -1;
     def.x = Phaser.Math.Clamp(def.x + dir * 70, 120, W - 120); def.place();
     def.setPose('hit'); def.busy = true;
     def.sp.setTintFill(0xffffff);
-    this.time.delayedCall(110, () => { if (def.tint) def.sp.setTint(def.tint); else def.sp.clearTint(); });
-    this.freeze = 200;
-    this.cameras.main.shake(450, 0.022);
+    this.time.delayedCall(110, () => def.sp.clearTint());
+    this.freeze = FIGHT.hitstop.ulta;
+    this.cameras.main.shake(FIGHT.shake.ulta, 0.022);
     SFX.over();
     this.refreshHP();
     this.time.delayedCall(800, () => { if (!def.dead) { def.busy = false; def.setPose('idle'); } });
@@ -296,28 +286,29 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   refreshHP() {
-    this.hp1.width = (this.p1.hp / 100) * 456;
-    this.hp2.width = (this.p2.hp / 100) * 456;
+    this.hp1.width = (this.p1.hp / this.p1.maxHealth) * 456;
+    this.hp2.width = (this.p2.hp / this.p2.maxHealth) * 456;
     [this.hp1, this.hp2].forEach((b, i) => {
-      const hp = i === 0 ? this.p1.hp : this.p2.hp;
-      b.fillColor = hp > 50 ? PAL.teal : hp > 22 ? PAL.brass : PAL.red;
+      const f = i === 0 ? this.p1 : this.p2;
+      const pct = f.hp / f.maxHealth * 100;
+      b.fillColor = pct > 50 ? PAL.teal : pct > 22 ? PAL.brass : PAL.red;
     });
   }
 
   update(time, delta) {
     if (this.over) return;
     if (this.freeze > 0) { this.freeze -= delta; return; }   // hitstop
-    if (this.combo > 0 && time - this.lastHit > 1300) { this.combo = 0; this.comboT.setText(''); }
+    if (this.combo > 0 && time - this.lastHit > FIGHT.comboWindowMs) { this.combo = 0; this.comboT.setText(''); }
     const dt = delta / 1000;
     const p1 = this.p1, p2 = this.p2;
 
     // Игрок
     p1.blocking = this.keyS.isDown && !p1.busy;
     if (!p1.busy) {
-      if (this.cursors.left.isDown || this.keyA.isDown) p1.move(-300 * dt);
-      if (this.cursors.right.isDown || this.keyD.isDown) p1.move(300 * dt);
+      if (this.cursors.left.isDown || this.keyA.isDown) p1.move(-p1.speed * dt);
+      if (this.cursors.right.isDown || this.keyD.isDown) p1.move(p1.speed * dt);
       if (!p1.blocking) {
-        if (this.meter1 >= 100 && Phaser.Input.Keyboard.JustDown(this.keyU)) this.doUlta(p1, p2);
+        if (this.meter1 >= FIGHT.meterFull && Phaser.Input.Keyboard.JustDown(this.keyU)) this.doUlta(p1, p2);
         else if (Phaser.Input.Keyboard.JustDown(this.keyJ)) this.attack(p1, p2, 'light');
         else if (Phaser.Input.Keyboard.JustDown(this.keyK)) this.attack(p1, p2, 'heavy');
         else if (p1.pose !== 'idle' && p1.pose !== 'win' && !p1.busy) p1.setPose('idle');
@@ -331,26 +322,66 @@ export default class BattleScene extends Phaser.Scene {
     p1.applyFace(); p2.applyFace();
   }
 
+  // ИИ по архетипу: профиль берётся из cfg.aiProfile (см. AI_PROFILES).
   ai(me, foe, dt, time) {
     if (me.dead || me.busy) return;
+    const P = AI_PROFILES[me.cfg.aiProfile] || AI_PROFILES.default;
     me.cool -= dt * 1000;
     const dx = Math.abs(me.x - foe.x);
-    if (dx > 190) {
-      me.blocking = false;
-      me.move(Math.sign(foe.x - me.x) * 170 * dt);
-      if (me.pose !== 'idle') me.setPose('idle');
-    } else if (me.cool <= 0) {
-      me.blocking = false;
-      if (this.meter2 >= 100) { this.doUlta(me, foe); me.cool = 1600; }
-      else {
-        const kind = Math.random() < 0.35 ? 'heavy' : 'light';
-        this.attack(me, foe, kind);
-        me.cool = 700 + Math.random() * 700;
-      }
-    } else {
-      // иногда блок
-      me.blocking = Math.random() < 0.02 ? true : me.blocking;
-      me.setPose(me.blocking ? 'block' : 'idle');
+    const toward = Math.sign(foe.x - me.x);
+    const foeAttacking = foe.busy && dx < 235;
+
+    // 1) Контратака: сразу наказать после удачного блока
+    if (me.counterReady && dx < P.range + 25) {
+      me.counterReady = false; me.blocking = false;
+      this.attack(me, foe, Math.random() < P.heavy ? 'heavy' : 'light');
+      me.cool = P.coolMin;
+      return;
     }
+    if (!foeAttacking) me.counterReady = false;   // окно наказания закрылось
+
+    // 2) Реактивный блок: вскинуть руки, когда игрок бьёт рядом
+    if (foeAttacking && me.cool > 0 && Math.random() < P.reactBlock) {
+      me.blocking = true; if (me.pose !== 'block') me.setPose('block');
+      return;
+    }
+
+    // 3) Спейсинг: отойти после своей атаки (контролёр/контратака)
+    if (me.aiRetreat > 0) {
+      me.aiRetreat -= dt * 1000;
+      me.blocking = false;
+      me.move(-toward * me.speed * P.approach * dt);
+      if (me.pose !== 'idle') me.setPose('idle');
+      return;
+    }
+
+    // 4) Слишком далеко — подойти
+    if (dx > P.range) {
+      me.blocking = false;
+      me.move(toward * me.speed * P.approach * dt);
+      if (me.pose !== 'idle') me.setPose('idle');
+      return;
+    }
+
+    // 5) В зоне и готов действовать
+    if (me.cool <= 0) {
+      if (this.meter2 >= FIGHT.meterFull) { me.blocking = false; this.doUlta(me, foe); me.cool = 1600; return; }
+      if (Math.random() < P.aggression) {
+        me.blocking = false;
+        this.attack(me, foe, Math.random() < P.heavy ? 'heavy' : 'light');
+        me.cool = P.coolMin + Math.random() * (P.coolMax - P.coolMin);
+        if (P.retreat) me.aiRetreat = P.retreat;
+      } else {
+        // выжидание: иногда поставить блок
+        me.blocking = Math.random() < P.block + 0.15;
+        if (me.pose !== (me.blocking ? 'block' : 'idle')) me.setPose(me.blocking ? 'block' : 'idle');
+        me.cool = 200 + Math.random() * 320;
+      }
+      return;
+    }
+
+    // 6) Простой: фоновый шанс блока
+    me.blocking = Math.random() < P.block ? true : me.blocking;
+    if (me.pose !== (me.blocking ? 'block' : 'idle')) me.setPose(me.blocking ? 'block' : 'idle');
   }
 }

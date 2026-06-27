@@ -63,12 +63,4 @@ export const ARENAS = [
   { key: 'arena2', name: 'Стройплощадка' },
 ];
 
-// Соперники-файтеры. key = префикс спрайтов (key_idle/_light/…). nativeRight —
-// в какую сторону смотрит арт. available — есть ли спрайты (иначе «скоро»).
-export const OPPONENTS = [
-  { key: 'sva',  name: 'Проверка СВА',         tag: 'Внутренний аудит',    nativeRight: false, available: true },
-  { key: 'gov',  name: 'Аппарат Правительства', tag: 'Тяжеловес сверху',   nativeRight: false, available: true },
-  { key: 'sp',   name: 'Счётная палата',        tag: 'Внешний госаудит',    nativeRight: false, available: true },
-  { key: 'prok', name: 'Прокуратура',           tag: 'Силовое давление',    nativeRight: false, available: false },
-];
-export const opponentByKey = (k) => OPPONENTS.find((o) => o.key === k) || OPPONENTS[0];
+// Соперники-файтеры переехали в src/core/fighters.js (полные конфиги).
