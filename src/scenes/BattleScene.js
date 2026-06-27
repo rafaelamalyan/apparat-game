@@ -9,6 +9,7 @@ import { getFighter, opponentByKey, careerOpponent } from '../core/fighters.js';
 import { FIGHT, AI_PROFILES } from '../core/balance.js';
 
 const GROUND = H - 60;
+const ROUND_SECONDS = 60;   // длительность раунда до «ВРЕМЯ!»
 
 // Боец, собранный из конфига (см. core/fighters.js).
 class Fighter {
@@ -81,6 +82,7 @@ export default class BattleScene extends Phaser.Scene {
     this.slowTag = null;
     this.wins1 = 0; this.wins2 = 0;   // победы в раундах (матч до 2)
     this.roundNum = 1;
+    this.roundTime = ROUND_SECONDS;   // таймер раунда
     this.refreshMeter();
     this.refreshViolations();
     this.announce('РАУНД 1 — ФАЙТ!', 1100);
@@ -120,6 +122,9 @@ export default class BattleScene extends Phaser.Scene {
         this.violPips.push(p);
       }
     }
+    // Таймер раунда — по центру между полосками
+    this.clockT = this.add.text(W / 2, 16, String(ROUND_SECONDS), { font: '800 34px "PT Serif"', color: HEX(PAL.paper) })
+      .setOrigin(0.5, 0).setDepth(46).setStroke(HEX(PAL.ink), 5);
     this.bigT = this.add.text(W / 2, H * 0.32, '', { font: '700 60px "PT Serif"', color: HEX(PAL.brass) })
       .setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 5);
     this.comboT = this.add.text(W / 2, 92, '', { font: '800 26px "PT Serif"', color: HEX(PAL.brass) })
@@ -214,6 +219,8 @@ export default class BattleScene extends Phaser.Scene {
     this.violations = 0; this.refreshViolations();
     this.p1SlowUntil = 0; if (this.slowTag) { this.slowTag.destroy(); this.slowTag = null; }
     this.combo = 0; this.comboT.setText(''); this.freeze = 0;
+    this.roundTime = ROUND_SECONDS;
+    this.clockT.setText(String(ROUND_SECONDS)).setColor(HEX(PAL.paper));
     this.refreshHP();
     this.over = false;
     this.bigT.setColor(HEX(PAL.brass));
@@ -333,17 +340,37 @@ export default class BattleScene extends Phaser.Scene {
     def.dead = true; def.setPose('ko'); def.busy = true;
     winner.setPose('win');
     SFX.over();
-    // Засчитать победу в раунде
+    this.concludeRound(winner, () => this.finisherKO(def, winner));
+  }
+
+  // Время раунда вышло — победу берёт тот, у кого больше здоровья (ничья → игрок).
+  timeUp() {
+    this.over = true;
+    const p1pct = this.p1.hp / this.p1.maxHealth, p2pct = this.p2.hp / this.p2.maxHealth;
+    const winner = p1pct >= p2pct ? this.p1 : this.p2;
+    winner.setPose('win'); winner.busy = true;
+    SFX.over();
+    this.bigT.setColor(HEX(PAL.brass));
+    this.announce('ВРЕМЯ!', 900);
+    this.time.delayedCall(1050, () => this.concludeRound(winner, () => {
+      this.bigT.setColor(winner === this.p1 ? HEX(PAL.brass) : HEX(PAL.red));
+      this.announce(winner === this.p1 ? 'ПОБЕДА ПО ОЧКАМ' : 'ПРОИГРЫШ ПО ОЧКАМ', 1500);
+      this.time.delayedCall(2100, () => { this.bigT.setColor(HEX(PAL.brass)); this.endBattle(winner === this.p1); });
+    }));
+  }
+
+  // Засчитать раунд: либо короткий баннер и новый раунд, либо финал матча (finisherFn).
+  concludeRound(winner, finisherFn) {
     if (winner === this.p1) this.wins1++; else this.wins2++;
     this.refreshWins();
-    const matchOver = this.wins1 >= 2 || this.wins2 >= 2;
-    if (!matchOver) {                       // ещё не матч — короткий баннер и новый раунд
-      this.bigT.setColor(winner === this.p1 ? HEX(PAL.brass) : HEX(PAL.red));
-      this.announce(winner === this.p1 ? 'РАУНД ЗА ВАМИ!' : 'РАУНД ПРОИГРАН', 1300);
-      this.time.delayedCall(1900, () => this.resetRound());
-      return;
-    }
-    // Финал матча — добивание.
+    if (this.wins1 >= 2 || this.wins2 >= 2) { finisherFn(); return; }
+    this.bigT.setColor(winner === this.p1 ? HEX(PAL.brass) : HEX(PAL.red));
+    this.announce(winner === this.p1 ? 'РАУНД ЗА ВАМИ!' : 'РАУНД ПРОИГРАН', 1300);
+    this.time.delayedCall(1900, () => this.resetRound());
+  }
+
+  // Добивание при нокауте: затемнение + «ЗАДВИНУТЬ ЕГО!» + штамп «УВОЛЕН».
+  finisherKO(def, winner) {
     const scrim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0).setDepth(57);
     this.tweens.add({ targets: scrim, alpha: 0.45, duration: 400 });
     this.bigT.setColor(HEX(PAL.red));
@@ -391,6 +418,15 @@ export default class BattleScene extends Phaser.Scene {
     if (this.combo > 0 && time - this.lastHit > FIGHT.comboWindowMs) { this.combo = 0; this.comboT.setText(''); }
     const dt = delta / 1000;
     const p1 = this.p1, p2 = this.p2;
+
+    // Таймер раунда
+    this.roundTime -= dt;
+    const secs = Math.max(0, Math.ceil(this.roundTime));
+    if (this.clockT.text !== String(secs)) {
+      this.clockT.setText(String(secs));
+      if (secs <= 10) this.clockT.setColor(HEX(PAL.red));
+    }
+    if (this.roundTime <= 0) { this.timeUp(); return; }
 
     // Дебафф «Предписание» Счётной палаты: замедление + метка над игроком
     const slowed = this.p1SlowUntil > time;
