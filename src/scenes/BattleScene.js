@@ -76,7 +76,11 @@ export default class BattleScene extends Phaser.Scene {
     this.lastHit = -9999;
     this.meter1 = 0;     // супер-метр «Админресурс»
     this.meter2 = 0;
+    this.violations = 0;        // уникальная механика Счётной палаты (фаза 3)
+    this.p1SlowUntil = 0;       // до какого времени игрок замедлен
+    this.slowTag = null;
     this.refreshMeter();
+    this.refreshViolations();
     this.announce('ФАЙТ!', 900);
   }
 
@@ -97,6 +101,17 @@ export default class BattleScene extends Phaser.Scene {
     this.mb2 = this.add.rectangle(W - 31, 42, 1, 4, PAL.brass).setOrigin(1, 0).setDepth(46);
     this.add.text(34, 50, 'СЕРЁГА', { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setDepth(46);
     this.add.text(W - 34, 50, this.opp.name.toUpperCase(), { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setOrigin(1, 0).setDepth(46);
+    // Индикатор уникальной механики соперника (пока — «Нарушения» Счётной палаты)
+    this.violPips = [];
+    if (this.opp.uniqueMechanic === 'violations') {
+      this.add.text(W - 30, 74, 'НАРУШЕНИЯ', { font: '700 12px PT Sans', color: HEX(PAL.brass) })
+        .setOrigin(1, 0).setDepth(46);
+      for (let i = 0; i < 3; i++) {
+        const p = this.add.rectangle(W - 110 + i * 26, 76, 20, 12, PAL.ink, 0.7)
+          .setStrokeStyle(2, PAL.brassDk).setOrigin(0, 0).setDepth(46);
+        this.violPips.push(p);
+      }
+    }
     this.bigT = this.add.text(W / 2, H * 0.32, '', { font: '700 60px "PT Serif"', color: HEX(PAL.brass) })
       .setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 5);
     this.comboT = this.add.text(W / 2, 92, '', { font: '800 26px "PT Serif"', color: HEX(PAL.brass) })
@@ -158,7 +173,13 @@ export default class BattleScene extends Phaser.Scene {
     if (def === this.p1) this.meter1 = Math.min(FIGHT.meterFull, this.meter1 + FIGHT.meterOnTaken); else this.meter2 = Math.min(FIGHT.meterFull, this.meter2 + FIGHT.meterOnTaken);
     this.refreshMeter();
     this.refreshHP();
-    if (def.hp <= 0) this.knockout(def, att);
+    if (def.hp <= 0) { this.knockout(def, att); return; }
+    // «Нарушения» Счётной палаты: незаблокированный удар по игроку копит счётчик
+    if (att === this.p2 && !blocked && def === this.p1 && this.opp.uniqueMechanic === 'violations') {
+      this.violations++;
+      this.refreshViolations();
+      if (this.violations >= 3) this.triggerViolations();
+    }
   }
 
   refreshMeter() {
@@ -166,6 +187,34 @@ export default class BattleScene extends Phaser.Scene {
     this.mb2.width = Math.max(1, this.meter2 / FIGHT.meterFull * (460 - 2));
     this.mb1.fillColor = this.meter1 >= FIGHT.meterFull ? PAL.red : PAL.brass;
     this.mb2.fillColor = this.meter2 >= FIGHT.meterFull ? PAL.red : PAL.brass;
+  }
+
+  refreshViolations() {
+    this.violPips.forEach((p, i) => {
+      const on = i < this.violations;
+      p.fillColor = on ? PAL.red : PAL.ink;
+      p.fillAlpha = on ? 1 : 0.7;
+    });
+  }
+
+  // 3 нарушения → «Предписание»: штрафной урон + замедление игрока, счётчик обнуляется.
+  triggerViolations() {
+    this.violations = 0;
+    this.refreshViolations();
+    const def = this.p1;
+    this.announce('ПРЕДПИСАНИЕ!', 1200);
+    this.callout('Устранить нарушения!', def.x, PAL.red);
+    def.hp = Math.max(0, def.hp - 12);
+    def.sp.setTintFill(0xffe08a);
+    this.time.delayedCall(130, () => { if (!def.dead) def.sp.clearTint(); });
+    this.cameras.main.shake(220, 0.01);
+    SFX.bad();
+    this.p1SlowUntil = this.time.now + 4000;   // замедление на 4 сек
+    if (this.slowTag) this.slowTag.destroy();
+    this.slowTag = this.add.text(def.x, GROUND - 340, '⏳ ПОД ПРЕДПИСАНИЕМ',
+      { font: '800 18px PT Sans', color: HEX(PAL.red) }).setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 4);
+    this.refreshHP();
+    if (def.hp <= 0) this.knockout(def, this.p2);
   }
 
   showCombo() {
@@ -302,11 +351,19 @@ export default class BattleScene extends Phaser.Scene {
     const dt = delta / 1000;
     const p1 = this.p1, p2 = this.p2;
 
+    // Дебафф «Предписание» Счётной палаты: замедление + метка над игроком
+    const slowed = this.p1SlowUntil > time;
+    const pSpeed = slowed ? p1.speed * 0.5 : p1.speed;
+    if (this.slowTag) {
+      if (slowed) { this.slowTag.x = p1.x; }
+      else { this.slowTag.destroy(); this.slowTag = null; }
+    }
+
     // Игрок
     p1.blocking = this.keyS.isDown && !p1.busy;
     if (!p1.busy) {
-      if (this.cursors.left.isDown || this.keyA.isDown) p1.move(-p1.speed * dt);
-      if (this.cursors.right.isDown || this.keyD.isDown) p1.move(p1.speed * dt);
+      if (this.cursors.left.isDown || this.keyA.isDown) p1.move(-pSpeed * dt);
+      if (this.cursors.right.isDown || this.keyD.isDown) p1.move(pSpeed * dt);
       if (!p1.blocking) {
         if (this.meter1 >= FIGHT.meterFull && Phaser.Input.Keyboard.JustDown(this.keyU)) this.doUlta(p1, p2);
         else if (Phaser.Input.Keyboard.JustDown(this.keyJ)) this.attack(p1, p2, 'light');
