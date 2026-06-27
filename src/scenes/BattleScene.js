@@ -79,9 +79,11 @@ export default class BattleScene extends Phaser.Scene {
     this.violations = 0;        // уникальная механика Счётной палаты (фаза 3)
     this.p1SlowUntil = 0;       // до какого времени игрок замедлен
     this.slowTag = null;
+    this.wins1 = 0; this.wins2 = 0;   // победы в раундах (матч до 2)
+    this.roundNum = 1;
     this.refreshMeter();
     this.refreshViolations();
-    this.announce('ФАЙТ!', 900);
+    this.announce('РАУНД 1 — ФАЙТ!', 1100);
   }
 
   buildHUD() {
@@ -101,6 +103,12 @@ export default class BattleScene extends Phaser.Scene {
     this.mb2 = this.add.rectangle(W - 31, 42, 1, 4, PAL.brass).setOrigin(1, 0).setDepth(46);
     this.add.text(34, 50, 'СЕРЁГА', { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setDepth(46);
     this.add.text(W - 34, 50, this.opp.name.toUpperCase(), { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setOrigin(1, 0).setDepth(46);
+    // Индикаторы побед в раундах (матч до 2): по 2 кружка над полосками здоровья
+    this.winPips1 = []; this.winPips2 = [];
+    for (let i = 0; i < 2; i++) {
+      this.winPips1.push(this.add.circle(38 + i * 18, 10, 6, PAL.ink, 0.6).setStrokeStyle(2, PAL.brassDk).setDepth(46));
+      this.winPips2.push(this.add.circle(W - 38 - i * 18, 10, 6, PAL.ink, 0.6).setStrokeStyle(2, PAL.brassDk).setDepth(46));
+    }
     // Индикатор уникальной механики соперника (пока — «Нарушения» Счётной палаты)
     this.violPips = [];
     if (this.opp.uniqueMechanic === 'violations') {
@@ -187,6 +195,29 @@ export default class BattleScene extends Phaser.Scene {
     this.mb2.width = Math.max(1, this.meter2 / FIGHT.meterFull * (460 - 2));
     this.mb1.fillColor = this.meter1 >= FIGHT.meterFull ? PAL.red : PAL.brass;
     this.mb2.fillColor = this.meter2 >= FIGHT.meterFull ? PAL.red : PAL.brass;
+  }
+
+  refreshWins() {
+    this.winPips1.forEach((p, i) => { const on = i < this.wins1; p.fillColor = on ? PAL.brass : PAL.ink; p.fillAlpha = on ? 1 : 0.6; });
+    this.winPips2.forEach((p, i) => { const on = i < this.wins2; p.fillColor = on ? PAL.red : PAL.ink; p.fillAlpha = on ? 1 : 0.6; });
+  }
+
+  // Сброс на новый раунд: лечим, ставим по местам, чистим состояния.
+  resetRound() {
+    this.roundNum++;
+    [[this.p1, W * 0.34], [this.p2, W * 0.66]].forEach(([f, x]) => {
+      f.hp = f.maxHealth; f.x = x; f.dead = false; f.busy = false; f.blocking = false;
+      f.cool = 0; f.aiRetreat = 0; f.counterReady = false; f.sp.clearTint();
+      f.setPose('idle'); f.place();
+    });
+    this.meter1 = 0; this.meter2 = 0; this.refreshMeter();
+    this.violations = 0; this.refreshViolations();
+    this.p1SlowUntil = 0; if (this.slowTag) { this.slowTag.destroy(); this.slowTag = null; }
+    this.combo = 0; this.comboT.setText(''); this.freeze = 0;
+    this.refreshHP();
+    this.over = false;
+    this.bigT.setColor(HEX(PAL.brass));
+    this.announce('РАУНД ' + this.roundNum + ' — ФАЙТ!', 1100);
   }
 
   refreshViolations() {
@@ -302,7 +333,17 @@ export default class BattleScene extends Phaser.Scene {
     def.dead = true; def.setPose('ko'); def.busy = true;
     winner.setPose('win');
     SFX.over();
-    // Добивание: затемнение + «ЗАДВИНУТЬ ЕГО!» + штамп «УВОЛЕН» слэмом.
+    // Засчитать победу в раунде
+    if (winner === this.p1) this.wins1++; else this.wins2++;
+    this.refreshWins();
+    const matchOver = this.wins1 >= 2 || this.wins2 >= 2;
+    if (!matchOver) {                       // ещё не матч — короткий баннер и новый раунд
+      this.bigT.setColor(winner === this.p1 ? HEX(PAL.brass) : HEX(PAL.red));
+      this.announce(winner === this.p1 ? 'РАУНД ЗА ВАМИ!' : 'РАУНД ПРОИГРАН', 1300);
+      this.time.delayedCall(1900, () => this.resetRound());
+      return;
+    }
+    // Финал матча — добивание.
     const scrim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0).setDepth(57);
     this.tweens.add({ targets: scrim, alpha: 0.45, duration: 400 });
     this.bigT.setColor(HEX(PAL.red));
