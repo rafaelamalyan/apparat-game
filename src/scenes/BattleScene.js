@@ -2,7 +2,7 @@
 // два бойца, полоски «Позиции», ходьба, лёгкий/тяжёлый удар, блок, ИИ, KO.
 // Соперник пока — зеркальный Серёга (плейсхолдер вместо «Проверки СВА»).
 import Phaser from 'phaser';
-import { W, H, PAL, HEX } from '../core/config.js';
+import { W, H, PAL, HEX, ARENAS } from '../core/config.js';
 import { SFX } from '../core/audio.js';
 import { run, saveBestRound } from '../core/run.js';
 
@@ -48,11 +48,10 @@ export default class BattleScene extends Phaser.Scene {
 
   create(data) {
     this.career = !!(data && data.career);   // дуэль внутри карьеры (vs тест по F)
-    // Чередование арен по дуэлям: Р3 коридор, Р6 стройка, Р9 коридор…
-    const arenas = ['arena', 'arena2'];
-    const key = this.career
-      ? arenas[(Math.floor(run.round / 3) - 1) % arenas.length]
-      : Phaser.Utils.Array.GetRandom(arenas);
+    // Арена: выбранная вручную → иначе ротация по дуэлям → иначе случайная.
+    const key = (data && data.arena) ? data.arena
+      : this.career ? ARENAS[(Math.floor(run.round / 3) - 1) % ARENAS.length].key
+      : Phaser.Utils.Array.GetRandom(ARENAS).key;
     this.add.image(0, 0, key).setOrigin(0).setDepth(0).setDisplaySize(W, H);
     this.add.rectangle(0, 0, W, H, 0x140c04, 0.20).setOrigin(0).setDepth(1);  // лёгкий скрим
     this.add.image(0, 0, 'vig').setOrigin(0).setDepth(41);

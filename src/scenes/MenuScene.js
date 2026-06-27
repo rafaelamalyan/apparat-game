@@ -51,7 +51,7 @@ export default class MenuScene extends Phaser.Scene {
       return b;
     };
     const career = () => { resetRun(); startRound(this); };
-    const fight = () => this.scene.start('Battle');   // сразу в бой (без карьеры)
+    const fight = () => this.scene.start('ArenaSelect');   // выбор арены → бой
     makeBtn(W / 2 - 178, 'НАЧАТЬ КАРЬЕРУ  ▶', PAL.brass, 0xf4c46a, PAL.ink, career);
     makeBtn(W / 2 + 200, 'В ЗАРУБУ  🥊', PAL.red, 0xd8485f, PAL.paper, fight);
     this.input.keyboard.once('keydown-SPACE', career);
