@@ -7,6 +7,7 @@ import GameScene from './scenes/GameScene.js';
 import ShopScene from './scenes/ShopScene.js';
 import BattleScene from './scenes/BattleScene.js';
 import ArenaSelectScene from './scenes/ArenaSelectScene.js';
+import OpponentSelectScene from './scenes/OpponentSelectScene.js';
 import OverScene from './scenes/OverScene.js';
 
 const game = new Phaser.Game({
@@ -20,7 +21,7 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, MenuScene, GameScene, ShopScene, BattleScene, ArenaSelectScene, OverScene],
+  scene: [BootScene, MenuScene, GameScene, ShopScene, BattleScene, ArenaSelectScene, OpponentSelectScene, OverScene],
 });
 
 if (import.meta.env.DEV) window.__APPARAT__ = game;

@@ -2,7 +2,7 @@
 // два бойца, полоски «Позиции», ходьба, лёгкий/тяжёлый удар, блок, ИИ, KO.
 // Соперник пока — зеркальный Серёга (плейсхолдер вместо «Проверки СВА»).
 import Phaser from 'phaser';
-import { W, H, PAL, HEX, ARENAS } from '../core/config.js';
+import { W, H, PAL, HEX, ARENAS, OPPONENTS, opponentByKey } from '../core/config.js';
 import { SFX } from '../core/audio.js';
 import { run, saveBestRound } from '../core/run.js';
 
@@ -14,6 +14,13 @@ const SERYOGA_MOVES = {
 const SVA_MOVES = {
   light: { pose: 'light', dmg: 7,  reach: 190, active: 120, recover: 250, push: 45,  fx: 'fx_akt',        fxKind: 'fly',  label: 'Акт проверки!' },
   heavy: { pose: 'heavy', dmg: 20, reach: 205, active: 240, recover: 490, push: 110, fx: 'fx_narushenie', fxKind: 'slam', label: 'Нарушение!' },
+};
+
+// Соперник для дуэли карьеры — по лестнице доступных, раунды 3,6,9…
+const careerOpponent = (round) => {
+  const avail = OPPONENTS.filter((o) => o.available);
+  const idx = Math.max(0, Math.floor(round / 3) - 1);
+  return avail[idx % avail.length];
 };
 
 class Fighter {
@@ -56,10 +63,13 @@ export default class BattleScene extends Phaser.Scene {
     this.add.rectangle(0, 0, W, H, 0x140c04, 0.20).setOrigin(0).setDepth(1);  // лёгкий скрим
     this.add.image(0, 0, 'vig').setOrigin(0).setDepth(41);
 
-    this.p1 = new Fighter(this, W * 0.34, 'seryoga', true, true, null);   // Серёга смотрит вправо
-    this.p2 = new Fighter(this, W * 0.66, 'sva', false, false, null);     // СВА нарисована влево
+    // Соперник: выбранный → иначе по лестнице карьеры → иначе СВА.
+    this.opp = this.career ? careerOpponent(run.round)
+      : opponentByKey(data && data.opponent);
+    this.p1 = new Fighter(this, W * 0.34, 'seryoga', true, true, null);
+    this.p2 = new Fighter(this, W * 0.66, this.opp.key, false, this.opp.nativeRight, null);
     this.p1.moves = SERYOGA_MOVES;
-    this.p2.moves = SVA_MOVES;
+    this.p2.moves = SVA_MOVES;   // пока общий набор приёмов для всех соперников
 
     this.buildHUD();
 
@@ -98,7 +108,7 @@ export default class BattleScene extends Phaser.Scene {
     this.mb1 = this.add.rectangle(31, 42, 1, 4, PAL.brass).setOrigin(0, 0).setDepth(46);
     this.mb2 = this.add.rectangle(W - 31, 42, 1, 4, PAL.brass).setOrigin(1, 0).setDepth(46);
     this.add.text(34, 50, 'СЕРЁГА', { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setDepth(46);
-    this.add.text(W - 34, 50, 'ПРОВЕРКА СВА', { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setOrigin(1, 0).setDepth(46);
+    this.add.text(W - 34, 50, this.opp.name.toUpperCase(), { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setOrigin(1, 0).setDepth(46);
     this.bigT = this.add.text(W / 2, H * 0.32, '', { font: '700 60px "PT Serif"', color: HEX(PAL.brass) })
       .setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 5);
     this.comboT = this.add.text(W / 2, 92, '', { font: '800 26px "PT Serif"', color: HEX(PAL.brass) })

@@ -5,7 +5,8 @@ import { W, H, PAL, HEX, ARENAS } from '../core/config.js';
 export default class ArenaSelectScene extends Phaser.Scene {
   constructor() { super('ArenaSelect'); }
 
-  create() {
+  create(data) {
+    this.opponent = data && data.opponent;
     this.add.image(0, 0, 'office').setOrigin(0).setDepth(0).setDisplaySize(W, H);
     this.add.rectangle(0, 0, W, H, 0x0d0a06, 0.66).setOrigin(0).setDepth(1);
     this.add.text(W / 2, 110, 'ВЫБЕРИ АРЕНУ',
@@ -30,6 +31,6 @@ export default class ArenaSelectScene extends Phaser.Scene {
     const card = this.add.container(cx, cy, [img, frame, name]).setSize(cw, ch).setDepth(14).setInteractive({ useHandCursor: true });
     card.on('pointerover', () => { frame.setStrokeStyle(6, PAL.brass); card.setScale(1.04); });
     card.on('pointerout', () => { frame.setStrokeStyle(4, PAL.brassDk); card.setScale(1); });
-    card.on('pointerdown', () => this.scene.start('Battle', { arena: a.key }));
+    card.on('pointerdown', () => this.scene.start('Battle', { arena: a.key, opponent: this.opponent }));
   }
 }
