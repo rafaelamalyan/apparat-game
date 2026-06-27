@@ -13,8 +13,9 @@ const MOVES = {
 };
 
 class Fighter {
-  constructor(scene, x, prefix, faceRight, tint) {
+  constructor(scene, x, prefix, faceRight, nativeRight, tint) {
     this.scene = scene; this.prefix = prefix; this.faceRight = faceRight;
+    this.nativeRight = nativeRight !== false;   // в какую сторону смотрит сам спрайт
     this.hp = 100; this.x = x; this.busy = false; this.blocking = false; this.dead = false;
     this.cool = 0;
     this.sp = scene.add.image(x, GROUND, prefix + '_idle').setOrigin(0.5, 1).setDepth(20);
@@ -24,7 +25,7 @@ class Fighter {
     this.tint = tint;
     this.applyFace();
   }
-  applyFace() { this.sp.setFlipX(!this.faceRight); }
+  applyFace() { this.sp.setFlipX(this.faceRight !== this.nativeRight); }
   setPose(p) {
     this.sp.setTexture(this.prefix + '_' + p);
     if (this.tint) this.sp.setTint(this.tint);
@@ -48,8 +49,8 @@ export default class BattleScene extends Phaser.Scene {
     // Шеф-судья на троне (в углу у стола).
     this.add.image(150, GROUND, 'karen_idle').setOrigin(0.5, 1).setScale(0.42).setDepth(15).setAlpha(0.92);
 
-    this.p1 = new Fighter(this, W * 0.34, 'seryoga', true, null);
-    this.p2 = new Fighter(this, W * 0.66, 'sva', false, null); // Проверка СВА
+    this.p1 = new Fighter(this, W * 0.34, 'seryoga', true, true, null);   // Серёга смотрит вправо
+    this.p2 = new Fighter(this, W * 0.66, 'sva', false, false, null);     // СВА нарисована влево
 
     this.buildHUD();
 
@@ -162,6 +163,7 @@ export default class BattleScene extends Phaser.Scene {
     this.ai(p2, p1, dt, time);
     // взгляд друг на друга
     p1.faceRight = p1.x < p2.x; p2.faceRight = p2.x < p1.x;
+    p1.applyFace(); p2.applyFace();
   }
 
   ai(me, foe, dt, time) {
