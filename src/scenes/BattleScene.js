@@ -11,6 +11,13 @@ import { FIGHT, AI_PROFILES } from '../core/balance.js';
 const GROUND = H - 60;
 const ROUND_SECONDS = 60;   // длительность раунда до «ВРЕМЯ!»
 
+// Кинематографичный грейд камеры по арене (контраст/насыщенность + сила свечения).
+// Цель — «склеить» разношёрстные спрайты и фон в одну картинку.
+const GRADE = {
+  arena:  { bri: 1.0,  sat: 0.10, con: 0.10, bloom: 0.55 },   // золотой зал
+  arena2: { bri: 0.99, sat: 0.16, con: 0.14, bloom: 0.60 },   // стройка-закат
+};
+
 // Боец, собранный из конфига (см. core/fighters.js).
 class Fighter {
   constructor(scene, x, cfg, faceRight) {
@@ -28,13 +35,17 @@ class Fighter {
     this.parrying = false; this.parryTried = false;   // окно парирования (СВА)
     this.pose = 'idle';
     this.sp = scene.add.image(x, GROUND, this.prefix + '_idle').setOrigin(0.5, 1).setDepth(20);
-    this.sp.setScale(300 / this.sp.height);
+    this.idleScale = 300 / this.sp.height;
+    this.sp.setScale(this.idleScale);
+    this.breathPhase = faceRight ? 0 : 1.7;        // рассинхрон дыхания бойцов
+    // Контактная тень под ногами — спрайт «приземляется», перестаёт быть наклейкой.
+    this.shadow = scene.add.ellipse(x, GROUND, this.sp.displayWidth * 0.6, 24, 0x000000, 0.32).setDepth(19);
     this.tint = null;
     this.applyFace();
   }
   applyFace() { this.sp.setFlipX(this.faceRight !== this.nativeRight); }
   setPose(p) { this.pose = p; this.sp.setTexture(this.prefix + '_' + p); this.applyFace(); }
-  place() { this.sp.x = this.x; }
+  place() { this.sp.x = this.x; this.shadow.x = this.x; }
   move(dx) {
     if (this.busy || this.dead) return;
     this.x = Phaser.Math.Clamp(this.x + dx, 120, W - 120);
@@ -54,12 +65,15 @@ export default class BattleScene extends Phaser.Scene {
     this.add.image(0, 0, key).setOrigin(0).setDepth(0).setDisplaySize(W, H);
     this.add.rectangle(0, 0, W, H, 0x140c04, 0.20).setOrigin(0).setDepth(1);  // лёгкий скрим
     this.add.image(0, 0, 'vig').setOrigin(0).setDepth(41);
+    this.applyGrade(key);   // пост-эффекты камеры (цветокоррекция + bloom)
+    this.rimColor = key === 'arena2' ? 0xffb878 : 0xffe0a8;   // тёплый контур под арену
 
     // Соперник: выбранный → иначе по лестнице карьеры → иначе первый доступный.
     this.opp = this.career ? careerOpponent(run.round)
       : opponentByKey(data && data.opponent);
     this.p1 = new Fighter(this, W * 0.34, getFighter('seryoga'), true);
     this.p2 = new Fighter(this, W * 0.66, this.opp, false);
+    this.applyRim();   // контурный свет (rim) под цвет арены — отделяет бойцов от фона
 
     this.buildHUD();
 
@@ -96,6 +110,9 @@ export default class BattleScene extends Phaser.Scene {
       g.lineStyle(3, PAL.brassDk, 1); g.strokeRoundedRect(x, 20, bw, 26, 6);
     };
     frame(30); frame(W - 30 - bw);
+    // «chip»-полоса урона (стиль MK): отстаёт от основной и догоняет с задержкой.
+    this.chip1 = this.add.rectangle(30 + 2, 23, bw - 4, 16, 0xd84a2e).setOrigin(0, 0).setDepth(45.6);
+    this.chip2 = this.add.rectangle(W - 30 - 2, 23, bw - 4, 16, 0xd84a2e).setOrigin(1, 0).setDepth(45.6);
     this.hp1 = this.add.rectangle(30 + 2, 23, bw - 4, 16, PAL.teal).setOrigin(0, 0).setDepth(46);
     this.hp2 = this.add.rectangle(W - 30 - 2, 23, bw - 4, 16, PAL.teal).setOrigin(1, 0).setDepth(46);
     this.add.text(34, 50, 'СЕРЁГА', { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setDepth(46);
@@ -165,15 +182,22 @@ export default class BattleScene extends Phaser.Scene {
     def.hp = Math.max(0, def.hp - dmg);
     const dir = att.faceRight ? 1 : -1;
     const push = (blocked ? m.push * 0.4 : m.push) / def.weight;   // тяжёлых отбрасывает меньше
+    const fromX = def.x;
     def.x = Phaser.Math.Clamp(def.x + dir * push, 120, W - 120);
     def.place();
     if (!blocked) { def.setPose('hit'); def.busy = true;
       this.time.delayedCall(260, () => { def.busy = false; if (!def.dead) def.setPose(def.blocking ? 'block' : 'idle'); });
     }
+    if (!blocked && Math.abs(def.x - fromX) > 16) this.afterimage(def, fromX, def.x);   // шлейф отлёта
     def.sp.setTintFill(0xffffff);
-    this.time.delayedCall(70, () => def.sp.clearTint());
+    this.time.delayedCall(heavy && !blocked ? 100 : 70, () => def.sp.clearTint());
     this.freeze = blocked ? FIGHT.hitstop.blocked : (heavy ? FIGHT.hitstop.heavy : FIGHT.hitstop.light);
-    this.sparks(def.x, GROUND - 150, blocked);
+    // «Сок» удара: искра-звезда + цифра урона + брызги бумаг (+ вспышка кадра на тяжёлом)
+    const cx = def.x + (att.faceRight ? -34 : 34), cy = GROUND - 150;
+    this.hitSpark(cx, cy, heavy, blocked);
+    this.damageNumber(cx, cy - 18, dmg, heavy, blocked);
+    if (!blocked) this.paperBurst(cx, cy, heavy ? 9 : 5);
+    if (heavy && !blocked) { this.impactFlash(); this.bloomPulse(); this.zoomPunch(); }
     this.cameras.main.shake(blocked ? FIGHT.shake.blocked : (heavy ? FIGHT.shake.heavy : FIGHT.shake.light), blocked ? 0.004 : (heavy ? 0.014 : 0.008));
     blocked ? SFX.bad() : SFX.life();
     if (def === this.p1 && !blocked) { this.combo = 0; this.comboT.setText(''); }   // игрока ударили — сброс
@@ -257,6 +281,8 @@ export default class BattleScene extends Phaser.Scene {
     this.violations = 0; this.refreshViolations();
     this.p1SlowUntil = 0; if (this.slowTag) { this.slowTag.destroy(); this.slowTag = null; }
     this.combo = 0; this.comboT.setText(''); this.freeze = 0;
+    if (this._smT) clearTimeout(this._smT);
+    this.time.timeScale = 1; this.tweens.timeScale = 1; this.cameras.main.zoom = 1;   // снять slow-mo/зум
     if (this.govBuffed || this.govAura) this.endPoruchenie();   // снять бафф босса
     this.govBuffed = false; this.poruchCD = FIGHT.poruch.firstMs;
     this.roundTime = ROUND_SECONDS;
@@ -301,9 +327,121 @@ export default class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: this.comboT, scale: 1, duration: 180, ease: 'Back.out' });
   }
 
-  sparks(x, y, blocked) {
-    const g = this.add.circle(x, y, 6, blocked ? PAL.brass : 0xffffff).setDepth(50);
-    this.tweens.add({ targets: g, scale: blocked ? 3 : 5, alpha: 0, duration: 260, onComplete: () => g.destroy() });
+  // Искра-звезда в точке контакта: ядро-вспышка + лучи + расходящееся кольцо.
+  hitSpark(x, y, heavy, blocked) {
+    const col = blocked ? PAL.brass : (heavy ? 0xffd24a : 0xffffff);
+    const n = blocked ? 5 : (heavy ? 9 : 6);
+    const len = heavy ? 58 : 38;
+    const core = this.add.circle(x, y, heavy ? 16 : 11, 0xffffff, 0.95).setDepth(51);
+    this.tweens.add({ targets: core, scale: heavy ? 2.4 : 1.8, alpha: 0, duration: 200, ease: 'Cubic.out', onComplete: () => core.destroy() });
+    for (let i = 0; i < n; i++) {
+      const a = (360 * i) / n + (blocked ? 0 : Phaser.Math.Between(0, 30));
+      const r = this.add.rectangle(x, y, len, heavy ? 6 : 4, col).setOrigin(0, 0.5).setDepth(51).setAngle(a);
+      this.tweens.add({ targets: r, scaleX: 0.1, alpha: 0, duration: heavy ? 280 : 200, ease: 'Cubic.out', onComplete: () => r.destroy() });
+    }
+    if (!blocked) {
+      const ring = this.add.circle(x, y, 8, 0xffffff, 0).setStrokeStyle(heavy ? 5 : 3, col).setDepth(51);
+      this.tweens.add({ targets: ring, scale: heavy ? 5 : 3.4, alpha: 0, duration: 300, ease: 'Cubic.out', onComplete: () => ring.destroy() });
+    }
+  }
+
+  // Всплывающая цифра урона: красная и крупная на тяжёлом, бледная на блоке.
+  damageNumber(x, y, dmg, heavy, blocked) {
+    const col = blocked ? PAL.brassDk : (heavy ? PAL.red : PAL.paper);
+    const size = blocked ? 20 : (heavy ? 40 : 28);
+    const t = this.add.text(x + Phaser.Math.Between(-16, 16), y, String(dmg),
+      { font: `900 ${size}px "PT Serif"`, color: HEX(col) }).setOrigin(0.5).setDepth(59).setStroke(HEX(PAL.ink), 5);
+    t.setScale(0.3);
+    this.tweens.add({ targets: t, scale: 1, duration: 130, ease: 'Back.out' });
+    this.tweens.add({ targets: t, y: y - (heavy ? 90 : 64), alpha: 0, delay: 240, duration: 460, ease: 'Cubic.in', onComplete: () => t.destroy() });
+  }
+
+  // Брызги бумаг из точки удара (тематичный «мусор» вместо абстрактных частиц).
+  paperBurst(x, y, n) {
+    for (let i = 0; i < n; i++) {
+      const p = this.add.image(x, y, 'paper').setDepth(50).setScale(Phaser.Math.FloatBetween(0.7, 1.4));
+      const ang = Phaser.Math.FloatBetween(-Math.PI, 0);          // разлёт вверх-в стороны
+      const dist = Phaser.Math.Between(60, 150);
+      this.tweens.add({
+        targets: p,
+        x: x + Math.cos(ang) * dist,
+        y: y + Math.sin(ang) * dist + 50,                          // к концу дуги — вниз
+        angle: Phaser.Math.Between(-220, 220),
+        alpha: 0,
+        duration: Phaser.Math.Between(420, 680),
+        ease: 'Cubic.out',
+        onComplete: () => p.destroy(),
+      });
+    }
+  }
+
+  // Шлейф отлёта: полупрозрачные «призраки» бойца между старой и новой позицией.
+  afterimage(f, fromX, toX) {
+    const ghosts = 3;
+    for (let i = 1; i <= ghosts; i++) {
+      const gx = fromX + (toX - fromX) * (i / (ghosts + 1));
+      const g = this.add.image(gx, GROUND, f.sp.texture.key).setOrigin(0.5, 1).setDepth(18)
+        .setScale(f.sp.scaleX, f.sp.scaleY).setFlipX(f.sp.flipX).setTint(0x9ec5ff).setAlpha(0.5);
+      this.tweens.add({ targets: g, alpha: 0, duration: 240, onComplete: () => g.destroy() });
+    }
+  }
+
+  // Короткая вспышка всего кадра (impact frame) на тяжёлом ударе.
+  impactFlash() {
+    const fl = this.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 0).setDepth(56);
+    this.tweens.add({ targets: fl, alpha: 0.16, duration: 45, yoyo: true, onComplete: () => fl.destroy() });
+  }
+
+  // Пост-эффекты камеры: цветокоррекция под арену + мягкий bloom.
+  // На Canvas-рендере (нет postFX) тихо пропускаем — игра работает без эффектов.
+  applyGrade(arenaKey) {
+    const cam = this.cameras.main;
+    this.bloom = null;
+    if (!cam.postFX) return;
+    const G = GRADE[arenaKey] || GRADE.arena;
+    const cm = cam.postFX.addColorMatrix();
+    cm.brightness(G.bri);            // базовая яркость
+    cm.saturate(G.sat, true);        // живее цвета (×multiply — поверх предыдущего)
+    cm.contrast(G.con, true);        // глубже контраст
+    this.bloomBase = G.bloom;
+    this.bloom = cam.postFX.addBloom(0xffffff, 1, 1, 1.0, G.bloom, 4);
+  }
+
+  // Контурный свет (rim): мягкое свечение по краю спрайта под цвет арены.
+  // Приближение rim light без шейдера — через per-object Glow FX. Только WebGL.
+  applyRim() {
+    const col = this.rimColor || 0xffe0a8;
+    [this.p1, this.p2].forEach((f) => {
+      if (!f.sp.postFX) return;        // Canvas-фолбэк
+      try { f.sp.postFX.addGlow(col, 2.0, 0, false); } catch (e) {}
+    });
+  }
+
+  // Кратковременный всплеск свечения (на тяжёлом ударе/добивании).
+  bloomPulse(extra = 0.85, ms = 280) {
+    if (!this.bloom) return;
+    this.tweens.killTweensOf(this.bloom);
+    this.bloom.strength = this.bloomBase + extra;
+    this.tweens.add({ targets: this.bloom, strength: this.bloomBase, duration: ms, ease: 'Quad.out' });
+  }
+
+  // Зум-панч камеры: короткий «удар» приближения на тяжёлом/нокауте.
+  zoomPunch(to = 1.035, ms = 90) {
+    const cam = this.cameras.main;
+    this.tweens.killTweensOf(cam);
+    this.tweens.add({ targets: cam, zoom: to, duration: ms, yoyo: true, ease: 'Quad.out',
+      onComplete: () => { cam.zoom = 1; } });
+  }
+
+  // Slow-mo: замедляет время сцены и твины; восстановление — по реальным часам
+  // (window.setTimeout не зависит от timeScale, иначе бы не вернулось).
+  slowmo(scale = 0.4, ms = 700) {
+    this.time.timeScale = scale;
+    this.tweens.timeScale = scale;
+    if (this._smT) clearTimeout(this._smT);
+    this._smT = window.setTimeout(() => {
+      if (this.scene && this.scene.isActive()) { this.time.timeScale = 1; this.tweens.timeScale = 1; }
+    }, ms);
   }
 
   // Визуал именного приёма: предмет (записка/печать/ножницы) + выкрик.
@@ -337,6 +475,8 @@ export default class BattleScene extends Phaser.Scene {
     this.over = true;
     def.dead = true; def.setPose('ko'); def.busy = true;
     winner.setPose('win');
+    this.zoomPunch(1.07, 150);     // удар приближения на решающем хите
+    this.slowmo(0.4, 750);          // кинематографичная замедленка
     SFX.over();
     this.concludeRound(winner, () => this.finisherKO(def, winner));
   }
@@ -375,6 +515,7 @@ export default class BattleScene extends Phaser.Scene {
     this.announce('ЗАДВИНУТЬ ЕГО!', 1100);
     this.time.delayedCall(950, () => {
       this.cameras.main.shake(320, 0.013);
+      this.bloomPulse(1.3, 420);
       const fl = this.add.rectangle(W / 2, H / 2, W, H, PAL.red, 0).setDepth(58);
       this.tweens.add({ targets: fl, alpha: 0.42, duration: 80, yoyo: true, onComplete: () => fl.destroy() });
       const stamp = this.add.text(def.x, GROUND - 170, 'УВОЛЕН\nПО СТАТЬЕ',
@@ -401,13 +542,22 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   refreshHP() {
-    this.hp1.width = (this.p1.hp / this.p1.maxHealth) * 456;
-    this.hp2.width = (this.p2.hp / this.p2.maxHealth) * 456;
+    const w1 = (this.p1.hp / this.p1.maxHealth) * 456;
+    const w2 = (this.p2.hp / this.p2.maxHealth) * 456;
+    this.hp1.width = w1; this.hp2.width = w2;
     [this.hp1, this.hp2].forEach((b, i) => {
       const f = i === 0 ? this.p1 : this.p2;
       const pct = f.hp / f.maxHealth * 100;
       b.fillColor = pct > 50 ? PAL.teal : pct > 22 ? PAL.brass : PAL.red;
     });
+    this.chipTo(this.chip1, w1); this.chipTo(this.chip2, w2);
+  }
+
+  // chip-полоса: при лечении — мгновенно вверх; при уроне — догоняет с задержкой.
+  chipTo(chip, w) {
+    this.tweens.killTweensOf(chip);
+    if (w >= chip.width) { chip.width = w; return; }
+    this.tweens.add({ targets: chip, width: w, delay: 260, duration: 420, ease: 'Quad.in' });
   }
 
   update(time, delta) {
@@ -463,6 +613,19 @@ export default class BattleScene extends Phaser.Scene {
     // взгляд друг на друга
     p1.faceRight = p1.x < p2.x; p2.faceRight = p2.x < p1.x;
     p1.applyFace(); p2.applyFace();
+
+    // Лёгкое дыхание в простое — спрайт «живой», а не вкопанный.
+    const bt = time / 600;
+    [p1, p2].forEach((f) => {
+      if (f.dead) return;
+      if (f.pose === 'idle' && !f.busy) {
+        const b = Math.sin(bt + f.breathPhase) * 0.012;
+        f.sp.scaleY = f.idleScale * (1 + b);
+        f.sp.scaleX = f.idleScale * (1 - b * 0.4);
+      } else if (f.sp.scaleY !== f.idleScale) {
+        f.sp.scaleY = f.idleScale; f.sp.scaleX = f.idleScale;
+      }
+    });
   }
 
   // ИИ по архетипу: профиль берётся из cfg.aiProfile (см. AI_PROFILES).
