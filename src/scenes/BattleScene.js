@@ -64,10 +64,15 @@ export default class BattleScene extends Phaser.Scene {
     this.keyK = this.input.keyboard.addKey('K');
     this.keyS = this.input.keyboard.addKey('S');
 
+    this.keyU = this.input.keyboard.addKey('U');
+
     this.over = false;
     this.freeze = 0;     // hitstop: пауза кадра в момент удара
     this.combo = 0;
     this.lastHit = -9999;
+    this.meter1 = 0;     // супер-метр «Админресурс»
+    this.meter2 = 0;
+    this.refreshMeter();
     this.announce('ФАЙТ!', 900);
   }
 
@@ -79,10 +84,15 @@ export default class BattleScene extends Phaser.Scene {
       g.lineStyle(3, PAL.brassDk, 1); g.strokeRoundedRect(x, 20, bw, 26, 6);
     };
     frame(30); frame(W - 30 - bw);
-    this.hp1 = this.add.rectangle(30 + 2, 23, bw - 4, 20, PAL.teal).setOrigin(0, 0).setDepth(46);
-    this.hp2 = this.add.rectangle(W - 30 - 2, 23, bw - 4, 20, PAL.teal).setOrigin(1, 0).setDepth(46);
-    this.add.text(34, 50, 'СЕРЁГА', { font: '700 14px PT Sans', color: HEX(PAL.paper) }).setDepth(46);
-    this.add.text(W - 34, 50, 'ПРОВЕРКА СВА', { font: '700 14px PT Sans', color: HEX(PAL.paper) }).setOrigin(1, 0).setDepth(46);
+    this.hp1 = this.add.rectangle(30 + 2, 23, bw - 4, 16, PAL.teal).setOrigin(0, 0).setDepth(46);
+    this.hp2 = this.add.rectangle(W - 30 - 2, 23, bw - 4, 16, PAL.teal).setOrigin(1, 0).setDepth(46);
+    // супер-метр «Админресурс» под здоровьем
+    this.add.rectangle(30, 41, bw, 6, PAL.ink, 0.6).setOrigin(0, 0).setDepth(45);
+    this.add.rectangle(W - 30, 41, bw, 6, PAL.ink, 0.6).setOrigin(1, 0).setDepth(45);
+    this.mb1 = this.add.rectangle(31, 42, 1, 4, PAL.brass).setOrigin(0, 0).setDepth(46);
+    this.mb2 = this.add.rectangle(W - 31, 42, 1, 4, PAL.brass).setOrigin(1, 0).setDepth(46);
+    this.add.text(34, 50, 'СЕРЁГА', { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setDepth(46);
+    this.add.text(W - 34, 50, 'ПРОВЕРКА СВА', { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setOrigin(1, 0).setDepth(46);
     this.bigT = this.add.text(W / 2, H * 0.32, '', { font: '700 60px "PT Serif"', color: HEX(PAL.brass) })
       .setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 5);
     this.comboT = this.add.text(W / 2, 92, '', { font: '800 26px "PT Serif"', color: HEX(PAL.brass) })
@@ -137,8 +147,19 @@ export default class BattleScene extends Phaser.Scene {
       this.lastHit = this.time.now;
       if (this.combo >= 2) this.showCombo();
     }
+    // супер-метр копится: бьющий больше, получающий меньше
+    if (att === this.p1) this.meter1 = Math.min(100, this.meter1 + 12); else this.meter2 = Math.min(100, this.meter2 + 12);
+    if (def === this.p1) this.meter1 = Math.min(100, this.meter1 + 8);  else this.meter2 = Math.min(100, this.meter2 + 8);
+    this.refreshMeter();
     this.refreshHP();
     if (def.hp <= 0) this.knockout(def, att);
+  }
+
+  refreshMeter() {
+    this.mb1.width = Math.max(1, this.meter1 / 100 * (460 - 2));
+    this.mb2.width = Math.max(1, this.meter2 / 100 * (460 - 2));
+    this.mb1.fillColor = this.meter1 >= 100 ? PAL.red : PAL.brass;
+    this.mb2.fillColor = this.meter2 >= 100 ? PAL.red : PAL.brass;
   }
 
   showCombo() {
@@ -179,6 +200,48 @@ export default class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: t, y: t.y - 34, alpha: 0, delay: 520, duration: 380, onComplete: () => t.destroy() });
   }
 
+  // Ульта «На проверку ДЭБ» — врываются маски-шоу.
+  doUlta(att, def) {
+    if (att.busy || att.dead || this.over) return;
+    att.busy = true;
+    if (att === this.p1) this.meter1 = 0; else this.meter2 = 0;
+    this.refreshMeter();
+    att.setPose('special');
+    this.bigT.setColor(HEX(PAL.red));
+    this.announce('НА ПРОВЕРКУ ДЭБ!', 1400);
+    const fl = this.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 0).setDepth(58);
+    this.tweens.add({ targets: fl, alpha: 0.6, duration: 90, yoyo: true, onComplete: () => fl.destroy() });
+    this.cameras.main.shake(200, 0.006);
+    const fromLeft = att.x < def.x;
+    const startX = fromLeft ? -140 : W + 140;
+    const debs = [1, 2, 3].map((n, i) => {
+      const im = this.add.image(startX - (fromLeft ? 1 : -1) * i * 80, GROUND, 'fx_deb_' + n).setOrigin(0.5, 1).setDepth(56);
+      im.setScale(330 / im.height).setFlipX(!fromLeft);
+      return im;
+    });
+    this.time.delayedCall(140, () => debs.forEach((im, i) =>
+      this.tweens.add({ targets: im, x: def.x + (fromLeft ? -1 : 1) * (40 - i * 60), duration: 380, ease: 'Quad.in' })));
+    this.time.delayedCall(580, () => { if (!this.over) this.ultaHit(att, def); });
+    this.time.delayedCall(1300, () => debs.forEach((im) =>
+      this.tweens.add({ targets: im, alpha: 0, duration: 300, onComplete: () => im.destroy() })));
+    this.time.delayedCall(1600, () => { this.bigT.setColor(HEX(PAL.brass)); att.busy = false; if (!att.dead) att.setPose('idle'); });
+  }
+
+  ultaHit(att, def) {
+    def.hp = Math.max(0, def.hp - 50);
+    const dir = att.faceRight ? 1 : -1;
+    def.x = Phaser.Math.Clamp(def.x + dir * 70, 120, W - 120); def.place();
+    def.setPose('hit'); def.busy = true;
+    def.sp.setTintFill(0xffffff);
+    this.time.delayedCall(110, () => { if (def.tint) def.sp.setTint(def.tint); else def.sp.clearTint(); });
+    this.freeze = 200;
+    this.cameras.main.shake(450, 0.022);
+    SFX.over();
+    this.refreshHP();
+    this.time.delayedCall(800, () => { if (!def.dead) { def.busy = false; def.setPose('idle'); } });
+    if (def.hp <= 0) this.knockout(def, att);
+  }
+
   knockout(def, winner) {
     this.over = true;
     def.dead = true; def.setPose('ko'); def.busy = true;
@@ -210,7 +273,8 @@ export default class BattleScene extends Phaser.Scene {
       if (this.cursors.left.isDown || this.keyA.isDown) p1.move(-300 * dt);
       if (this.cursors.right.isDown || this.keyD.isDown) p1.move(300 * dt);
       if (!p1.blocking) {
-        if (Phaser.Input.Keyboard.JustDown(this.keyJ)) this.attack(p1, p2, 'light');
+        if (this.meter1 >= 100 && Phaser.Input.Keyboard.JustDown(this.keyU)) this.doUlta(p1, p2);
+        else if (Phaser.Input.Keyboard.JustDown(this.keyJ)) this.attack(p1, p2, 'light');
         else if (Phaser.Input.Keyboard.JustDown(this.keyK)) this.attack(p1, p2, 'heavy');
         else if (p1.pose !== 'idle' && p1.pose !== 'win' && !p1.busy) p1.setPose('idle');
       } else if (p1.pose !== 'block') p1.setPose('block');
@@ -233,9 +297,12 @@ export default class BattleScene extends Phaser.Scene {
       if (me.pose !== 'idle') me.setPose('idle');
     } else if (me.cool <= 0) {
       me.blocking = false;
-      const kind = Math.random() < 0.35 ? 'heavy' : 'light';
-      this.attack(me, foe, kind);
-      me.cool = 700 + Math.random() * 700;
+      if (this.meter2 >= 100) { this.doUlta(me, foe); me.cool = 1600; }
+      else {
+        const kind = Math.random() < 0.35 ? 'heavy' : 'light';
+        this.attack(me, foe, kind);
+        me.cool = 700 + Math.random() * 700;
+      }
     } else {
       // иногда блок
       me.blocking = Math.random() < 0.02 ? true : me.blocking;
