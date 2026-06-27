@@ -41,16 +41,21 @@ export default class MenuScene extends Phaser.Scene {
     rules.forEach((r, i) => this.add.text(W / 2, 624 + i * 23, r,
       { font: '15px PT Sans', color: '#cdd6e6' }).setOrigin(0.5).setDepth(60));
 
-    const btn = this.add.text(W / 2, 720, 'НАЧАТЬ КАРЬЕРУ  ▶',
-      { font: '800 28px PT Sans', color: HEX(PAL.ink), backgroundColor: HEX(PAL.brass), padding: { x: 32, y: 14 } })
-      .setOrigin(0.5).setDepth(60).setInteractive({ useHandCursor: true });
-    btn.on('pointerover', () => { btn.setScale(1.05); btn.setBackgroundColor(HEX(0xf4c46a)); });
-    btn.on('pointerout', () => { btn.setScale(1); btn.setBackgroundColor(HEX(PAL.brass)); });
-
-    const go = () => { resetRun(); startRound(this); };
-    btn.on('pointerdown', go);
-    this.input.keyboard.once('keydown-SPACE', go);
-    this.input.keyboard.once('keydown-ENTER', go);
-    this.input.keyboard.once('keydown-F', () => this.scene.start('Battle')); // тест файтинга
+    const makeBtn = (x, label, bg, hover, txt, onClick) => {
+      const b = this.add.text(x, 722, label,
+        { font: '800 23px PT Sans', color: HEX(txt), backgroundColor: HEX(bg), padding: { x: 24, y: 13 } })
+        .setOrigin(0.5).setDepth(60).setInteractive({ useHandCursor: true });
+      b.on('pointerover', () => { b.setScale(1.05); b.setBackgroundColor(HEX(hover)); });
+      b.on('pointerout', () => { b.setScale(1); b.setBackgroundColor(HEX(bg)); });
+      b.on('pointerdown', onClick);
+      return b;
+    };
+    const career = () => { resetRun(); startRound(this); };
+    const fight = () => this.scene.start('Battle');   // сразу в бой (без карьеры)
+    makeBtn(W / 2 - 178, 'НАЧАТЬ КАРЬЕРУ  ▶', PAL.brass, 0xf4c46a, PAL.ink, career);
+    makeBtn(W / 2 + 200, 'В ЗАРУБУ  🥊', PAL.red, 0xd8485f, PAL.paper, fight);
+    this.input.keyboard.once('keydown-SPACE', career);
+    this.input.keyboard.once('keydown-ENTER', career);
+    this.input.keyboard.once('keydown-F', fight);
   }
 }
