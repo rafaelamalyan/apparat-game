@@ -2,12 +2,8 @@
 export const FIGHT = {
   blockMult: 0.25,          // во сколько режется урон в блок
   comboWindowMs: 1300,      // окно между ударами для комбо
-  meterFull: 100,           // полный супер-метр (ульта)
-  meterOnHit: 12,           // прирост метра за нанесённый удар
-  meterOnTaken: 8,          // за полученный
-  hitstop: { light: 80, heavy: 130, blocked: 40, ulta: 200 },   // заморозка кадра, мс
-  shake:   { light: 170, heavy: 280, blocked: 90, ulta: 450 },  // длительность тряски
-  ultaDamage: 50,
+  hitstop: { light: 80, heavy: 130, blocked: 40 },   // заморозка кадра, мс
+  shake:   { light: 170, heavy: 280, blocked: 90 },  // длительность тряски
   // Парирование (механика СВА): окно идеального блока и контрудар.
   parry: { windowMs: 320, chance: 0.4, counterDelay: 150, pushback: 60 },
   // «Поручение» (механика Аппарата Правительства): периодический бафф.

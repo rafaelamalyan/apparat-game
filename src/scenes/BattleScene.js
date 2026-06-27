@@ -70,14 +70,10 @@ export default class BattleScene extends Phaser.Scene {
     this.keyK = this.input.keyboard.addKey('K');
     this.keyS = this.input.keyboard.addKey('S');
 
-    this.keyU = this.input.keyboard.addKey('U');
-
     this.over = false;
     this.freeze = 0;     // hitstop: пауза кадра в момент удара
     this.combo = 0;
     this.lastHit = -9999;
-    this.meter1 = 0;     // супер-метр «Админресурс»
-    this.meter2 = 0;
     this.violations = 0;        // уникальная механика Счётной палаты (фаза 3)
     this.p1SlowUntil = 0;       // до какого времени игрок замедлен
     this.slowTag = null;
@@ -88,7 +84,6 @@ export default class BattleScene extends Phaser.Scene {
     this.govBuffUntil = 0;
     this.poruchCD = FIGHT.poruch.firstMs;
     this.govAura = null; this.govTag = null;
-    this.refreshMeter();
     this.refreshViolations();
     this.announce('РАУНД 1 — ФАЙТ!', 1100);
   }
@@ -103,11 +98,6 @@ export default class BattleScene extends Phaser.Scene {
     frame(30); frame(W - 30 - bw);
     this.hp1 = this.add.rectangle(30 + 2, 23, bw - 4, 16, PAL.teal).setOrigin(0, 0).setDepth(46);
     this.hp2 = this.add.rectangle(W - 30 - 2, 23, bw - 4, 16, PAL.teal).setOrigin(1, 0).setDepth(46);
-    // супер-метр «Админресурс» под здоровьем
-    this.add.rectangle(30, 41, bw, 6, PAL.ink, 0.6).setOrigin(0, 0).setDepth(45);
-    this.add.rectangle(W - 30, 41, bw, 6, PAL.ink, 0.6).setOrigin(1, 0).setDepth(45);
-    this.mb1 = this.add.rectangle(31, 42, 1, 4, PAL.brass).setOrigin(0, 0).setDepth(46);
-    this.mb2 = this.add.rectangle(W - 31, 42, 1, 4, PAL.brass).setOrigin(1, 0).setDepth(46);
     this.add.text(34, 50, 'СЕРЁГА', { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setDepth(46);
     this.add.text(W - 34, 50, this.opp.name.toUpperCase(), { font: '700 13px PT Sans', color: HEX(PAL.paper) }).setOrigin(1, 0).setDepth(46);
     // Индикаторы побед в раундах (матч до 2): по 2 кружка над полосками здоровья
@@ -192,9 +182,6 @@ export default class BattleScene extends Phaser.Scene {
       this.lastHit = this.time.now;
       if (this.combo >= 2) this.showCombo();
     }
-    if (att === this.p1) this.meter1 = Math.min(FIGHT.meterFull, this.meter1 + FIGHT.meterOnHit); else this.meter2 = Math.min(FIGHT.meterFull, this.meter2 + FIGHT.meterOnHit);
-    if (def === this.p1) this.meter1 = Math.min(FIGHT.meterFull, this.meter1 + FIGHT.meterOnTaken); else this.meter2 = Math.min(FIGHT.meterFull, this.meter2 + FIGHT.meterOnTaken);
-    this.refreshMeter();
     this.refreshHP();
     if (def.hp <= 0) { this.knockout(def, att); return; }
     // «Нарушения» Счётной палаты: незаблокированный удар по игроку копит счётчик
@@ -203,13 +190,6 @@ export default class BattleScene extends Phaser.Scene {
       this.refreshViolations();
       if (this.violations >= 3) this.triggerViolations();
     }
-  }
-
-  refreshMeter() {
-    this.mb1.width = Math.max(1, this.meter1 / FIGHT.meterFull * (460 - 2));
-    this.mb2.width = Math.max(1, this.meter2 / FIGHT.meterFull * (460 - 2));
-    this.mb1.fillColor = this.meter1 >= FIGHT.meterFull ? PAL.red : PAL.brass;
-    this.mb2.fillColor = this.meter2 >= FIGHT.meterFull ? PAL.red : PAL.brass;
   }
 
   // «Поручение»: босс входит в усиленный режим на несколько секунд (можно переждать).
@@ -274,7 +254,6 @@ export default class BattleScene extends Phaser.Scene {
       f.cool = 0; f.aiRetreat = 0; f.counterReady = false; f.parrying = false; f.parryTried = false; f.sp.clearTint();
       f.setPose('idle'); f.place();
     });
-    this.meter1 = 0; this.meter2 = 0; this.refreshMeter();
     this.violations = 0; this.refreshViolations();
     this.p1SlowUntil = 0; if (this.slowTag) { this.slowTag.destroy(); this.slowTag = null; }
     this.combo = 0; this.comboT.setText(''); this.freeze = 0;
@@ -352,48 +331,6 @@ export default class BattleScene extends Phaser.Scene {
     t.setScale(0.5).setAlpha(0);
     this.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 140, ease: 'Back.out' });
     this.tweens.add({ targets: t, y: t.y - 34, alpha: 0, delay: 520, duration: 380, onComplete: () => t.destroy() });
-  }
-
-  // Ульта «На проверку ДЭБ» — врываются маски-шоу.
-  doUlta(att, def) {
-    if (att.busy || att.dead || this.over) return;
-    att.busy = true;
-    if (att === this.p1) this.meter1 = 0; else this.meter2 = 0;
-    this.refreshMeter();
-    att.setPose('special');
-    this.bigT.setColor(HEX(PAL.red));
-    this.announce('НА ПРОВЕРКУ ДЭБ!', 1400);
-    const fl = this.add.rectangle(W / 2, H / 2, W, H, 0xffffff, 0).setDepth(58);
-    this.tweens.add({ targets: fl, alpha: 0.6, duration: 90, yoyo: true, onComplete: () => fl.destroy() });
-    this.cameras.main.shake(200, 0.006);
-    const fromLeft = att.x < def.x;
-    const startX = fromLeft ? -140 : W + 140;
-    const debs = [1, 2, 3].map((n, i) => {
-      const im = this.add.image(startX - (fromLeft ? 1 : -1) * i * 80, GROUND, 'fx_deb_' + n).setOrigin(0.5, 1).setDepth(56);
-      im.setScale(330 / im.height).setFlipX(!fromLeft);
-      return im;
-    });
-    this.time.delayedCall(140, () => debs.forEach((im, i) =>
-      this.tweens.add({ targets: im, x: def.x + (fromLeft ? -1 : 1) * (40 - i * 60), duration: 380, ease: 'Quad.in' })));
-    this.time.delayedCall(580, () => { if (!this.over) this.ultaHit(att, def); });
-    this.time.delayedCall(1300, () => debs.forEach((im) =>
-      this.tweens.add({ targets: im, alpha: 0, duration: 300, onComplete: () => im.destroy() })));
-    this.time.delayedCall(1600, () => { this.bigT.setColor(HEX(PAL.brass)); att.busy = false; if (!att.dead) att.setPose('idle'); });
-  }
-
-  ultaHit(att, def) {
-    def.hp = Math.max(0, def.hp - Math.round(FIGHT.ultaDamage * def.defense));
-    const dir = att.faceRight ? 1 : -1;
-    def.x = Phaser.Math.Clamp(def.x + dir * 70, 120, W - 120); def.place();
-    def.setPose('hit'); def.busy = true;
-    def.sp.setTintFill(0xffffff);
-    this.time.delayedCall(110, () => def.sp.clearTint());
-    this.freeze = FIGHT.hitstop.ulta;
-    this.cameras.main.shake(FIGHT.shake.ulta, 0.022);
-    SFX.over();
-    this.refreshHP();
-    this.time.delayedCall(800, () => { if (!def.dead) { def.busy = false; def.setPose('idle'); } });
-    if (def.hp <= 0) this.knockout(def, att);
   }
 
   knockout(def, winner) {
@@ -515,8 +452,7 @@ export default class BattleScene extends Phaser.Scene {
       if (this.cursors.left.isDown || this.keyA.isDown) p1.move(-pSpeed * dt);
       if (this.cursors.right.isDown || this.keyD.isDown) p1.move(pSpeed * dt);
       if (!p1.blocking) {
-        if (this.meter1 >= FIGHT.meterFull && Phaser.Input.Keyboard.JustDown(this.keyU)) this.doUlta(p1, p2);
-        else if (Phaser.Input.Keyboard.JustDown(this.keyJ)) this.attack(p1, p2, 'light');
+        if (Phaser.Input.Keyboard.JustDown(this.keyJ)) this.attack(p1, p2, 'light');
         else if (Phaser.Input.Keyboard.JustDown(this.keyK)) this.attack(p1, p2, 'heavy');
         else if (p1.pose !== 'idle' && p1.pose !== 'win' && !p1.busy) p1.setPose('idle');
       } else if (p1.pose !== 'block') p1.setPose('block');
@@ -587,7 +523,6 @@ export default class BattleScene extends Phaser.Scene {
 
     // 5) В зоне и готов действовать
     if (me.cool <= 0) {
-      if (this.meter2 >= FIGHT.meterFull) { me.blocking = false; this.doUlta(me, foe); me.cool = 1600; return; }
       if (Math.random() < P.aggression) {
         me.blocking = false;
         this.attack(me, foe, Math.random() < P.heavy ? 'heavy' : 'light');
