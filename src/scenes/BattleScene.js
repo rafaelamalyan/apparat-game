@@ -248,9 +248,23 @@ export default class BattleScene extends Phaser.Scene {
     this.over = true;
     def.dead = true; def.setPose('ko'); def.busy = true;
     winner.setPose('win');
-    this.announce('K.O.', 1600);
     SFX.over();
-    this.time.delayedCall(2300, () => this.endBattle(winner === this.p1));
+    // Добивание: затемнение + «ЗАДВИНУТЬ ЕГО!» + штамп «УВОЛЕН» слэмом.
+    const scrim = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0).setDepth(57);
+    this.tweens.add({ targets: scrim, alpha: 0.45, duration: 400 });
+    this.bigT.setColor(HEX(PAL.red));
+    this.announce('ЗАДВИНУТЬ ЕГО!', 1100);
+    this.time.delayedCall(950, () => {
+      this.cameras.main.shake(320, 0.013);
+      const fl = this.add.rectangle(W / 2, H / 2, W, H, PAL.red, 0).setDepth(58);
+      this.tweens.add({ targets: fl, alpha: 0.42, duration: 80, yoyo: true, onComplete: () => fl.destroy() });
+      const stamp = this.add.text(def.x, GROUND - 170, 'УВОЛЕН\nПО СТАТЬЕ',
+        { font: '900 42px "PT Serif"', color: HEX(PAL.red), align: 'center' })
+        .setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.redDk), 8).setAngle(-12);
+      stamp.setScale(3).setAlpha(0);
+      this.tweens.add({ targets: stamp, scale: 1, alpha: 1, duration: 130, ease: 'Back.out' });
+    });
+    this.time.delayedCall(2700, () => { this.bigT.setColor(HEX(PAL.brass)); this.endBattle(winner === this.p1); });
   }
 
   endBattle(playerWon) {
