@@ -8,6 +8,8 @@ export const FIGHT = {
   hitstop: { light: 80, heavy: 130, blocked: 40, ulta: 200 },   // заморозка кадра, мс
   shake:   { light: 170, heavy: 280, blocked: 90, ulta: 450 },  // длительность тряски
   ultaDamage: 50,
+  // Парирование (механика СВА): окно идеального блока и контрудар.
+  parry: { windowMs: 320, chance: 0.4, counterDelay: 150, pushback: 60 },
   // Эталонные множители архетипов (для справки/будущих бойцов).
   archetype: {
     allrounder:  { hp: 1.0,  atk: 1.0,  def: 1.0,  speed: 1.0,  weight: 1.0 },

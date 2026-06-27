@@ -25,6 +25,7 @@ class Fighter {
     this.moves = cfg.moves;
     this.x = x; this.busy = false; this.blocking = false; this.dead = false; this.cool = 0;
     this.aiRetreat = 0; this.counterReady = false;   // состояние ИИ (фаза 2)
+    this.parrying = false; this.parryTried = false;   // окно парирования (СВА)
     this.pose = 'idle';
     this.sp = scene.add.image(x, GROUND, this.prefix + '_idle').setOrigin(0.5, 1).setDepth(20);
     this.sp.setScale(300 / this.sp.height);
@@ -153,6 +154,8 @@ export default class BattleScene extends Phaser.Scene {
   }
 
   hit(att, def, m) {
+    // Парирование: СВА в окне идеального блока — удар игрока уходит в ноль.
+    if (def.parrying && def !== this.p1) { this.doParry(att, def); return; }
     const blocked = def.blocking;
     const heavy = m.dmg >= 18;
     // ИИ-контратакёр (СВА) зарядил наказание после удачного блока
@@ -202,6 +205,29 @@ export default class BattleScene extends Phaser.Scene {
     this.mb2.fillColor = this.meter2 >= FIGHT.meterFull ? PAL.red : PAL.brass;
   }
 
+  // Парирование СВА: удар погашен, игрок застрял в отыгрыше, СВА бьёт в ответ.
+  doParry(att, def) {
+    def.parrying = false;
+    const P = FIGHT.parry;
+    this.callout('ПАРИРОВАНО!', att.x, PAL.red);
+    // золотая вспышка на СВА
+    def.sp.setTintFill(0xffe8a0);
+    this.time.delayedCall(140, () => { if (!def.dead) def.sp.clearTint(); });
+    const fl = this.add.rectangle(W / 2, H / 2, W, H, 0xffe8a0, 0).setDepth(58);
+    this.tweens.add({ targets: fl, alpha: 0.28, duration: 70, yoyo: true, onComplete: () => fl.destroy() });
+    // игрока откидывает, лёгкий стан-кадр
+    const dir = att.faceRight ? -1 : 1;
+    att.x = Phaser.Math.Clamp(att.x + dir * P.pushback, 120, W - 120); att.place();
+    att.setPose('hit'); att.busy = true;
+    this.freeze = FIGHT.hitstop.heavy;
+    this.cameras.main.shake(180, 0.006);
+    SFX.bad();
+    // гарантированный контрудар СВА
+    this.time.delayedCall(P.counterDelay, () => {
+      if (!this.over && !def.dead && !att.dead) this.attack(def, att, 'heavy');
+    });
+  }
+
   refreshWins() {
     this.winPips1.forEach((p, i) => { const on = i < this.wins1; p.fillColor = on ? PAL.brass : PAL.ink; p.fillAlpha = on ? 1 : 0.6; });
     this.winPips2.forEach((p, i) => { const on = i < this.wins2; p.fillColor = on ? PAL.red : PAL.ink; p.fillAlpha = on ? 1 : 0.6; });
@@ -212,7 +238,7 @@ export default class BattleScene extends Phaser.Scene {
     this.roundNum++;
     [[this.p1, W * 0.34], [this.p2, W * 0.66]].forEach(([f, x]) => {
       f.hp = f.maxHealth; f.x = x; f.dead = false; f.busy = false; f.blocking = false;
-      f.cool = 0; f.aiRetreat = 0; f.counterReady = false; f.sp.clearTint();
+      f.cool = 0; f.aiRetreat = 0; f.counterReady = false; f.parrying = false; f.parryTried = false; f.sp.clearTint();
       f.setPose('idle'); f.place();
     });
     this.meter1 = 0; this.meter2 = 0; this.refreshMeter();
@@ -473,6 +499,21 @@ export default class BattleScene extends Phaser.Scene {
       return;
     }
     if (!foeAttacking) me.counterReady = false;   // окно наказания закрылось
+
+    // 1.5) Парирование (СВА): один бросок шанса на каждый удар игрока
+    if (me.cfg.uniqueMechanic === 'parry') {
+      if (!foeAttacking) me.parryTried = false;
+      if (foeAttacking && !me.parrying && !me.parryTried && dx < P.range + 20) {
+        me.parryTried = true;
+        if (Math.random() < FIGHT.parry.chance) {
+          me.parrying = true; me.blocking = true; me.setPose('block');
+          me.sp.setTint(0xfff0b0);                 // золотой намёк на идеальный блок
+          me.cool = 900;
+          this.time.delayedCall(FIGHT.parry.windowMs, () => { me.parrying = false; if (!me.dead) me.sp.clearTint(); });
+          return;
+        }
+      }
+    }
 
     // 2) Реактивный блок: вскинуть руки, когда игрок бьёт рядом
     if (foeAttacking && me.cool > 0 && Math.random() < P.reactBlock) {
