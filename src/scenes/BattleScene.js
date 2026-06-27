@@ -48,7 +48,12 @@ export default class BattleScene extends Phaser.Scene {
 
   create(data) {
     this.career = !!(data && data.career);   // дуэль внутри карьеры (vs тест по F)
-    this.add.image(0, 0, 'arena').setOrigin(0).setDepth(0).setDisplaySize(W, H);
+    // Чередование арен по дуэлям: Р3 коридор, Р6 стройка, Р9 коридор…
+    const arenas = ['arena', 'arena2'];
+    const key = this.career
+      ? arenas[(Math.floor(run.round / 3) - 1) % arenas.length]
+      : Phaser.Utils.Array.GetRandom(arenas);
+    this.add.image(0, 0, key).setOrigin(0).setDepth(0).setDisplaySize(W, H);
     this.add.rectangle(0, 0, W, H, 0x140c04, 0.20).setOrigin(0).setDepth(1);  // лёгкий скрим
     this.add.image(0, 0, 'vig').setOrigin(0).setDepth(41);
 
