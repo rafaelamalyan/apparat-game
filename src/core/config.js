@@ -67,7 +67,7 @@ export const ARENAS = [
 // в какую сторону смотрит арт. available — есть ли спрайты (иначе «скоро»).
 export const OPPONENTS = [
   { key: 'sva',  name: 'Проверка СВА',         tag: 'Внутренний аудит',    nativeRight: false, available: true },
-  { key: 'gov',  name: 'Аппарат Правительства', tag: 'Тяжеловес сверху',   nativeRight: false, available: false },
+  { key: 'gov',  name: 'Аппарат Правительства', tag: 'Тяжеловес сверху',   nativeRight: true,  available: true },
   { key: 'sp',   name: 'Счётная палата',        tag: 'Внешний госаудит',    nativeRight: false, available: false },
   { key: 'prok', name: 'Прокуратура',           tag: 'Силовое давление',    nativeRight: false, available: false },
 ];

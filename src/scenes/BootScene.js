@@ -5,7 +5,7 @@ import { W, H, DEPTS } from '../core/config.js';
 
 const CHARS = ['karen_idle', 'karen_throw', 'karen_angry', 'sergey_idle', 'sergey_catch', 'sergey_carry', 'olya_catch', 'olya_carry'];
 const FIGHTER_POSES = ['idle', 'light', 'heavy', 'special', 'hit', 'block', 'win', 'ko'];
-const FIGHTERS = ['seryoga', 'sva'];
+const FIGHTERS = ['seryoga', 'sva', 'gov'];
 const FX = ['zapiska', 'nesoglasovano', 'dokladnaya', 'scissors', 'vygovor', 'akt', 'narushenie', 'deb_1', 'deb_2', 'deb_3'];
 
 export default class BootScene extends Phaser.Scene {
