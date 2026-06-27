@@ -4,6 +4,7 @@
 import Phaser from 'phaser';
 import { W, H, PAL, HEX } from '../core/config.js';
 import { SFX } from '../core/audio.js';
+import { run, saveBestRound } from '../core/run.js';
 
 const GROUND = H - 60;
 const SERYOGA_MOVES = {
@@ -45,7 +46,8 @@ class Fighter {
 export default class BattleScene extends Phaser.Scene {
   constructor() { super('Battle'); }
 
-  create() {
+  create(data) {
+    this.career = !!(data && data.career);   // дуэль внутри карьеры (vs тест по F)
     this.add.image(0, 0, 'arena').setOrigin(0).setDepth(0).setDisplaySize(W, H);
     this.add.rectangle(0, 0, W, H, 0x140c04, 0.20).setOrigin(0).setDepth(1);  // лёгкий скрим
     this.add.image(0, 0, 'vig').setOrigin(0).setDepth(41);
@@ -248,7 +250,21 @@ export default class BattleScene extends Phaser.Scene {
     winner.setPose('win');
     this.announce('K.O.', 1600);
     SFX.over();
-    this.time.delayedCall(2200, () => this.scene.start('Menu'));
+    this.time.delayedCall(2300, () => this.endBattle(winner === this.p1));
+  }
+
+  endBattle(playerWon) {
+    if (!this.career) { this.scene.start('Menu'); return; }   // тест по F
+    if (playerWon) {
+      const premia = 80 + Math.round(this.p1.hp) + run.round * 8;
+      run.budget += premia; run.totalEarned += premia;
+      run.lastResult = { round: run.round, premia, duel: true, hp: Math.round(this.p1.hp) };
+      saveBestRound(run.round);
+      this.scene.start('Shop');
+    } else {
+      const record = saveBestRound(run.round);
+      this.scene.start('Over', { round: run.round, budget: run.budget, totalEarned: run.totalEarned, record });
+    }
   }
 
   refreshHP() {

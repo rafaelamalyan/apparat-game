@@ -2,7 +2,7 @@
 import Phaser from 'phaser';
 import { W, H, PAL, HEX } from '../core/config.js';
 import { buildOffice } from '../core/office.js';
-import { run, SHOP, costOf, isMaxed } from '../core/run.js';
+import { run, SHOP, costOf, isMaxed, startRound } from '../core/run.js';
 import { SFX } from '../core/audio.js';
 
 export default class ShopScene extends Phaser.Scene {
@@ -16,14 +16,16 @@ export default class ShopScene extends Phaser.Scene {
     const r = run.lastResult || { round: run.round, score: 0, livesBonus: 0, noLossBonus: 0, premia: 0, noLoss: false };
 
     // Заголовок + разбивка премии.
-    this.add.text(W / 2, 40, 'РАУНД ' + r.round + ' СДАН',
+    this.add.text(W / 2, 40, r.duel ? 'ДУЭЛЬ ВЫИГРАНА' : ('РАУНД ' + r.round + ' СДАН'),
       { font: '700 40px "PT Serif"', color: HEX(PAL.paper) }).setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 4);
 
-    const lines = [
-      'Очки за раунд:  ' + r.score,
-      'Бонус за жизни:  +' + r.livesBonus,
-      ...(r.noLossBonus ? ['Без потерь:  +' + r.noLossBonus] : []),
-    ];
+    const lines = r.duel
+      ? ['Соперник задвинут!', 'Остаток сил:  +' + (r.hp || 0)]
+      : [
+        'Очки за раунд:  ' + r.score,
+        'Бонус за жизни:  +' + r.livesBonus,
+        ...(r.noLossBonus ? ['Без потерь:  +' + r.noLossBonus] : []),
+      ];
     this.add.text(W / 2, 92, lines.join('     '),
       { font: '600 17px PT Sans', color: '#b8c2dc' }).setOrigin(0.5).setDepth(60);
     this.add.text(W / 2, 124, '💰 ПРЕМИЯ:  +' + r.premia + ' ₽',
@@ -50,7 +52,7 @@ export default class ShopScene extends Phaser.Scene {
       .setOrigin(0.5).setDepth(60).setInteractive({ useHandCursor: true });
     btn.on('pointerover', () => btn.setScale(1.05));
     btn.on('pointerout', () => btn.setScale(1));
-    const go = () => { run.round += 1; this.scene.start('Game'); };
+    const go = () => { run.round += 1; startRound(this); };
     btn.on('pointerdown', go);
     this.input.keyboard.once('keydown-ENTER', go);
     this.input.keyboard.once('keydown-SPACE', go);

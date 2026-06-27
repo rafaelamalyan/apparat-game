@@ -2,7 +2,7 @@
 import Phaser from 'phaser';
 import { W, PAL, HEX } from '../core/config.js';
 import { buildOffice } from '../core/office.js';
-import { resetRun, getBestRound } from '../core/run.js';
+import { resetRun, getBestRound, startRound } from '../core/run.js';
 
 export default class MenuScene extends Phaser.Scene {
   constructor() { super('Menu'); }
@@ -47,7 +47,7 @@ export default class MenuScene extends Phaser.Scene {
     btn.on('pointerover', () => { btn.setScale(1.05); btn.setBackgroundColor(HEX(0xf4c46a)); });
     btn.on('pointerout', () => { btn.setScale(1); btn.setBackgroundColor(HEX(PAL.brass)); });
 
-    const go = () => { resetRun(); this.scene.start('Game'); };
+    const go = () => { resetRun(); startRound(this); };
     btn.on('pointerdown', go);
     this.input.keyboard.once('keydown-SPACE', go);
     this.input.keyboard.once('keydown-ENTER', go);

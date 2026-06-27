@@ -49,6 +49,13 @@ export const isMaxed = (item) => run.upgrades[item.key] >= item.max;
 export const roundDuration = (r) => Math.min(30 + (r - 1) * 15, 90);   // сек
 export const roundDiff = (r) => 1 + (r - 1) * 0.12;                     // множитель скорости падения
 
+// Раунды 3, 6, 9… — дуэль (файтинг) вместо ловли.
+export const isDuelRound = (r) => r % 3 === 0;
+// Запуск нужной сцены под текущий раунд карьеры.
+export function startRound(scene) {
+  scene.scene.start(isDuelRound(run.round) ? 'Battle' : 'Game', { career: true });
+}
+
 // Рекорд карьеры — самый далёкий раунд.
 export const getBestRound = () => +localStorage.getItem('apparat_best_round') || 0;
 export const saveBestRound = (r) => {

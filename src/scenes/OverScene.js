@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 import { W, H, PAL, HEX } from '../core/config.js';
 import { buildOffice } from '../core/office.js';
 import { SFX } from '../core/audio.js';
-import { resetRun, getBestRound } from '../core/run.js';
+import { resetRun, getBestRound, startRound } from '../core/run.js';
 
 export default class OverScene extends Phaser.Scene {
   constructor() { super('Over'); }
@@ -45,7 +45,7 @@ export default class OverScene extends Phaser.Scene {
     btn.on('pointerover', () => btn.setScale(1.05));
     btn.on('pointerout', () => btn.setScale(1));
 
-    const go = () => { resetRun(); this.scene.start('Game'); };
+    const go = () => { resetRun(); startRound(this); };
     btn.on('pointerdown', go);
     this.input.keyboard.once('keydown-SPACE', go);
     this.input.keyboard.once('keydown-ENTER', go);
