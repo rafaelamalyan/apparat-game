@@ -7,9 +7,13 @@ import { buildOffice } from '../core/office.js';
 import { SFX } from '../core/audio.js';
 
 const GROUND = H - 60;
-const MOVES = {
-  light: { pose: 'light', dmg: 7,  reach: 180, active: 110, recover: 240, push: 40 },
-  heavy: { pose: 'heavy', dmg: 20, reach: 200, active: 230, recover: 480, push: 110 },
+const SERYOGA_MOVES = {
+  light: { pose: 'light', dmg: 7,  reach: 185, active: 110, recover: 240, push: 45,  fx: 'fx_zapiska',  fxKind: 'fly',  label: 'Служебная записка!' },
+  heavy: { pose: 'heavy', dmg: 20, reach: 205, active: 230, recover: 480, push: 110, fx: 'fx_scissors', fxKind: 'slam', label: 'Срезать премию!' },
+};
+const SVA_MOVES = {
+  light: { pose: 'light', dmg: 7,  reach: 190, active: 120, recover: 250, push: 45,  fx: 'fx_akt',        fxKind: 'fly',  label: 'Акт проверки!' },
+  heavy: { pose: 'heavy', dmg: 20, reach: 205, active: 240, recover: 490, push: 110, fx: 'fx_narushenie', fxKind: 'slam', label: 'Нарушение!' },
 };
 
 class Fighter {
@@ -46,11 +50,10 @@ export default class BattleScene extends Phaser.Scene {
     buildOffice(this);
     this.add.image(0, 0, 'vig').setOrigin(0).setDepth(41);
 
-    // Шеф-судья на троне (в углу у стола).
-    this.add.image(150, GROUND, 'karen_idle').setOrigin(0.5, 1).setScale(0.42).setDepth(15).setAlpha(0.92);
-
     this.p1 = new Fighter(this, W * 0.34, 'seryoga', true, true, null);   // Серёга смотрит вправо
     this.p2 = new Fighter(this, W * 0.66, 'sva', false, false, null);     // СВА нарисована влево
+    this.p1.moves = SERYOGA_MOVES;
+    this.p2.moves = SVA_MOVES;
 
     this.buildHUD();
 
@@ -89,7 +92,7 @@ export default class BattleScene extends Phaser.Scene {
 
   attack(att, def, kind) {
     if (att.busy || att.dead || this.over) return;
-    const m = MOVES[kind];
+    const m = att.moves[kind];
     att.busy = true;
     att.setPose(m.pose);
     SFX.catch();
@@ -104,6 +107,7 @@ export default class BattleScene extends Phaser.Scene {
 
   hit(att, def, m) {
     const blocked = def.blocking;
+    this.showMoveFx(att, def, m);
     const dmg = blocked ? Math.round(m.dmg * 0.25) : m.dmg;
     def.hp = Math.max(0, def.hp - dmg);
     const dir = att.faceRight ? 1 : -1;
@@ -122,6 +126,33 @@ export default class BattleScene extends Phaser.Scene {
   sparks(x, y, blocked) {
     const g = this.add.circle(x, y, 6, blocked ? PAL.brass : 0xffffff).setDepth(50);
     this.tweens.add({ targets: g, scale: blocked ? 3 : 5, alpha: 0, duration: 260, onComplete: () => g.destroy() });
+  }
+
+  // Визуал именного приёма: предмет (записка/печать/ножницы) + выкрик.
+  showMoveFx(att, def, m) {
+    if (m.fx) {
+      const fx = this.add.image(0, GROUND - 150, m.fx).setDepth(55);
+      const s = 150 / fx.height;
+      if (m.fxKind === 'slam') {
+        fx.setPosition(def.x, GROUND - 150).setScale(s * 2.6).setAngle(-14).setAlpha(0);
+        this.tweens.add({ targets: fx, scale: s, alpha: 1, duration: 110, ease: 'Back.out' });
+        this.time.delayedCall(360, () => this.tweens.add({ targets: fx, alpha: 0, duration: 220, onComplete: () => fx.destroy() }));
+      } else {
+        fx.setPosition(att.x + (att.faceRight ? 70 : -70), GROUND - 150).setScale(s);
+        this.tweens.add({ targets: fx, x: def.x, angle: att.faceRight ? 300 : -300, duration: 200,
+          onComplete: () => this.tweens.add({ targets: fx, alpha: 0, scale: s * 0.6, duration: 160, onComplete: () => fx.destroy() }) });
+      }
+    }
+    this.callout(m.label, def.x, att === this.p1 ? PAL.brass : PAL.red);
+  }
+
+  callout(txt, x, color) {
+    if (!txt) return;
+    const t = this.add.text(Phaser.Math.Clamp(x, 220, W - 220), GROUND - 280, txt,
+      { font: '700 30px "PT Serif"', color: HEX(color) }).setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.ink), 5);
+    t.setScale(0.5).setAlpha(0);
+    this.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 140, ease: 'Back.out' });
+    this.tweens.add({ targets: t, y: t.y - 34, alpha: 0, delay: 520, duration: 380, onComplete: () => t.destroy() });
   }
 
   knockout(def, winner) {
