@@ -84,6 +84,10 @@ export default class BattleScene extends Phaser.Scene {
     this.wins1 = 0; this.wins2 = 0;   // победы в раундах (матч до 2)
     this.roundNum = 1;
     this.roundTime = ROUND_SECONDS;   // таймер раунда
+    this.govBuffed = false;           // «Поручение» Аппарата Правительства (фаза 3)
+    this.govBuffUntil = 0;
+    this.poruchCD = FIGHT.poruch.firstMs;
+    this.govAura = null; this.govTag = null;
     this.refreshMeter();
     this.refreshViolations();
     this.announce('РАУНД 1 — ФАЙТ!', 1100);
@@ -164,6 +168,9 @@ export default class BattleScene extends Phaser.Scene {
     // урон = сила бьющего × защита получающего × (блок)
     let dmg = m.dmg * att.attackPower * def.defense;
     if (blocked) dmg *= FIGHT.blockMult;
+    // «Поручение»: босс под баффом бьёт сильнее и держит крепче
+    if (this.govBuffed && att === this.p2) dmg *= FIGHT.poruch.atkMul;
+    if (this.govBuffed && def === this.p2) dmg *= FIGHT.poruch.armorMul;
     dmg = Math.max(1, Math.round(dmg));
     def.hp = Math.max(0, def.hp - dmg);
     const dir = att.faceRight ? 1 : -1;
@@ -203,6 +210,32 @@ export default class BattleScene extends Phaser.Scene {
     this.mb2.width = Math.max(1, this.meter2 / FIGHT.meterFull * (460 - 2));
     this.mb1.fillColor = this.meter1 >= FIGHT.meterFull ? PAL.red : PAL.brass;
     this.mb2.fillColor = this.meter2 >= FIGHT.meterFull ? PAL.red : PAL.brass;
+  }
+
+  // «Поручение»: босс входит в усиленный режим на несколько секунд (можно переждать).
+  startPoruchenie(time) {
+    this.govBuffed = true;
+    this.govBuffUntil = time + FIGHT.poruch.durationMs;
+    const g = this.p2;
+    this.bigT.setColor(HEX(PAL.red));
+    this.announce('ПОРУЧЕНИЕ!', 1100);
+    this.callout('Под мою ответственность!', g.x, PAL.red);
+    SFX.bad();
+    this.cameras.main.shake(200, 0.008);
+    // аура под боссом (яркий пульс) + читаемая метка
+    this.govAura = this.add.ellipse(g.x, GROUND - 140, 250, 380, 0xff3b30, 0.34).setDepth(19);
+    this.tweens.add({ targets: this.govAura, alpha: 0.6, scaleX: 1.12, scaleY: 1.08, duration: 520, yoyo: true, repeat: -1 });
+    this.govTag = this.add.text(g.x, GROUND - 330, '⚡ ПОД ПОРУЧЕНИЕМ', { font: '900 19px PT Sans', color: HEX(PAL.paper) })
+      .setOrigin(0.5).setDepth(60).setStroke(HEX(PAL.redDk), 6);
+    this.tweens.add({ targets: this.govTag, alpha: 0.5, duration: 480, yoyo: true, repeat: -1 });
+    this.time.delayedCall(900, () => this.bigT.setColor(HEX(PAL.brass)));
+  }
+
+  endPoruchenie() {
+    this.govBuffed = false;
+    this.poruchCD = FIGHT.poruch.everyMs;
+    if (this.govAura) { this.tweens.killTweensOf(this.govAura); this.govAura.destroy(); this.govAura = null; }
+    if (this.govTag) { this.tweens.killTweensOf(this.govTag); this.govTag.destroy(); this.govTag = null; }
   }
 
   // Парирование СВА: удар погашен, игрок застрял в отыгрыше, СВА бьёт в ответ.
@@ -245,6 +278,8 @@ export default class BattleScene extends Phaser.Scene {
     this.violations = 0; this.refreshViolations();
     this.p1SlowUntil = 0; if (this.slowTag) { this.slowTag.destroy(); this.slowTag = null; }
     this.combo = 0; this.comboT.setText(''); this.freeze = 0;
+    if (this.govBuffed || this.govAura) this.endPoruchenie();   // снять бафф босса
+    this.govBuffed = false; this.poruchCD = FIGHT.poruch.firstMs;
     this.roundTime = ROUND_SECONDS;
     this.clockT.setText(String(ROUND_SECONDS)).setColor(HEX(PAL.paper));
     this.refreshHP();
@@ -453,6 +488,18 @@ export default class BattleScene extends Phaser.Scene {
       if (secs <= 10) this.clockT.setColor(HEX(PAL.red));
     }
     if (this.roundTime <= 0) { this.timeUp(); return; }
+
+    // «Поручение» Аппарата Правительства: периодический бафф-окно
+    if (this.p2.cfg.uniqueMechanic === 'poruchenie' && !this.p2.dead) {
+      if (this.govBuffed) {
+        if (this.govAura) { this.govAura.x = this.p2.x; }
+        if (this.govTag) { this.govTag.x = this.p2.x; }
+        if (time > this.govBuffUntil) this.endPoruchenie();
+      } else {
+        this.poruchCD -= delta;
+        if (this.poruchCD <= 0) this.startPoruchenie(time);
+      }
+    }
 
     // Дебафф «Предписание» Счётной палаты: замедление + метка над игроком
     const slowed = this.p1SlowUntil > time;

@@ -10,6 +10,8 @@ export const FIGHT = {
   ultaDamage: 50,
   // Парирование (механика СВА): окно идеального блока и контрудар.
   parry: { windowMs: 320, chance: 0.4, counterDelay: 150, pushback: 60 },
+  // «Поручение» (механика Аппарата Правительства): периодический бафф.
+  poruch: { firstMs: 7000, everyMs: 14000, durationMs: 4200, atkMul: 1.45, armorMul: 0.55 },
   // Эталонные множители архетипов (для справки/будущих бойцов).
   archetype: {
     allrounder:  { hp: 1.0,  atk: 1.0,  def: 1.0,  speed: 1.0,  weight: 1.0 },
