@@ -51,5 +51,6 @@ export default class MenuScene extends Phaser.Scene {
     btn.on('pointerdown', go);
     this.input.keyboard.once('keydown-SPACE', go);
     this.input.keyboard.once('keydown-ENTER', go);
+    this.input.keyboard.once('keydown-F', () => this.scene.start('Battle')); // тест файтинга
   }
 }

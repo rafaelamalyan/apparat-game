@@ -4,12 +4,14 @@ import Phaser from 'phaser';
 import { W, H, DEPTS } from '../core/config.js';
 
 const CHARS = ['karen_idle', 'karen_throw', 'karen_angry', 'sergey_idle', 'sergey_catch', 'sergey_carry', 'olya_catch', 'olya_carry'];
+const FIGHTER_POSES = ['idle', 'light', 'heavy', 'special', 'hit', 'block', 'win', 'ko'];
 
 export default class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
   preload() {
     for (const k of CHARS) this.load.image(k, `sprites/${k}.png`);
+    for (const p of FIGHTER_POSES) this.load.image('seryoga_' + p, `sprites/fighters/seryoga_${p}.png`);
     this.load.image('office', 'bg/office.jpg');
   }
 
